@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="vi">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Leaflet Map Template</title>
+
+        <!-- Bootstrap 5 -->
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+            rel="stylesheet"
+        />
+
+        <!-- Leaflet -->
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+        <!-- Turf.js -->
+        <script src="https://unpkg.com/@turf/turf@7/turf.min.js"></script>
+
+        <!-- Proj4js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+
+        <!-- Module 1: WFSUtil -->
+        <script src="assets/js/leaflet/leaflet-wfs-util.js"></script>
+        <!-- Module 2: WMSLayerManager -->
+        <script src="assets/js/leaflet/leaflet-wms-manager.js"></script>
+        <!-- Module 3: PointManager -->
+        <script src="assets/js/leaflet/leaflet-point-manager.js"></script>
+
+        <style>
+            html,
+            body {
+                height: 100%;
+                overflow: hidden;
+            }
+
+            #map {
+                height: calc(100vh - 56px - 1.5rem);
+                width: 100%;
+                border-radius: 0.375rem;
+            }
+
+            .panel-scroll {
+                height: calc(100vh - 56px - 1.5rem);
+                overflow-y: auto;
+            }
+
+            .card {
+                border-radius: 0.375rem;
+            }
+
+            .card-header {
+                padding: 0.5rem 0.75rem;
+            }
+
+            .card-body {
+                padding: 0.75rem;
+            }
+        </style>
+    </head>
+
+    <body class="bg-light">
+        <!-- Navbar -->
+        <nav class="navbar navbar-dark bg-dark py-2">
+            <div class="container-fluid">
+                <span class="navbar-brand mb-0 h6">
+                    <i class="bi bi-map"></i> Leaflet Map Template
+                </span>
+            </div>
+        </nav>
+
+        <div class="container-fluid mt-2">
+            <div class="row g-2">
+                <!-- Cot 1: Ban do -->
+                <div class="col-lg-8">
+                    <div class="card shadow-sm h-100">
+                        <div
+                            class="card-header d-flex align-items-center justify-content-between py-1"
+                        >
+                            <h6 class="mb-0 small">
+                                <i class="bi bi-geo-alt-fill text-danger"></i>
+                                Ban do
+                            </h6>
+                            <span
+                                class="badge bg-success"
+                                id="mapStatus"
+                                style="font-size: 0.7rem"
+                                >San sang</span
+                            >
+                        </div>
+                        <div class="card-body p-1">
+                            <div id="map"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cot 2: Cong cu -->
+                <div class="col-lg-4">
+                    <div class="panel-scroll">
+                        <!-- Loc theo dia gioi -->
+                        <div class="card shadow-sm mb-2">
+                            <div class="card-header py-1">
+                                <h6 class="mb-0 small">
+                                    <i
+                                        class="bi bi-funnel-fill text-primary"
+                                    ></i>
+                                    Loc theo dia gioi
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <label
+                                        class="form-label small fw-semibold mb-1"
+                                        >Tinh / Thanh pho</label
+                                    >
+                                    <select
+                                        class="form-select form-select-sm"
+                                        id="province_code"
+                                    >
+                                        <option value="">
+                                            [Chon tinh/thanh pho]
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label
+                                        class="form-label small fw-semibold mb-1"
+                                        >Xa / Phuong</label
+                                    >
+                                    <select
+                                        class="form-select form-select-sm"
+                                        id="commune_code"
+                                    >
+                                        <option value="">
+                                            [Chon xa/phuong]
+                                        </option>
+                                    </select>
+                                </div>
+                                <button
+                                    class="btn btn-outline-secondary btn-sm w-100"
+                                    onclick="resetFilter()"
+                                >
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                    Xoa bo loc
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Quan ly lop WMS -->
+                        <div class="card shadow-sm mb-2">
+                            <div
+                                class="card-header py-1"
+                                role="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#wmsPanel"
+                            >
+                                <h6 class="mb-0 small">
+                                    <i
+                                        class="bi bi-layers-fill text-success"
+                                    ></i>
+                                    Quan ly lop WMS
+                                </h6>
+                            </div>
+                            <div class="collapse show" id="wmsPanel">
+                                <div
+                                    class="card-body p-0"
+                                    id="wmsListContainer"
+                                ></div>
+                            </div>
+                        </div>
+
+                        <!-- Truy van WFS -->
+                        <div class="card shadow-sm mb-2">
+                            <div
+                                class="card-header py-1"
+                                role="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#wfsQueryPanel"
+                            >
+                                <h6 class="mb-0 small">
+                                    <i class="bi bi-search text-info"></i> Truy
+                                    van WFS
+                                </h6>
+                            </div>
+                            <div class="collapse" id="wfsQueryPanel">
+                                <div class="card-body">
+                                    <div class="mb-2">
+                                        <label
+                                            class="form-label small fw-semibold mb-1"
+                                            >Ten lop</label
+                                        >
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm"
+                                            id="layerName"
+                                            value="ws_ranhgioi:rg_vn_tinh_2025"
+                                        />
+                                    </div>
+                                    <div class="mb-2">
+                                        <label
+                                            class="form-label small fw-semibold mb-1"
+                                            >Bo loc CQL</label
+                                        >
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm"
+                                            id="cqlFilter"
+                                            placeholder="VD: province_c='01'"
+                                        />
+                                    </div>
+                                    <div class="mb-2">
+                                        <label
+                                            class="form-label small fw-semibold mb-1"
+                                            >So luong toi da</label
+                                        >
+                                        <input
+                                            type="number"
+                                            class="form-control form-control-sm"
+                                            id="maxFeatures"
+                                            value="10"
+                                        />
+                                    </div>
+                                    <div class="d-grid gap-1">
+                                        <button
+                                            class="btn btn-primary btn-sm"
+                                            onclick="testFetchGeoJSON()"
+                                        >
+                                            <i class="bi bi-download"></i> Tai
+                                            GeoJSON
+                                        </button>
+                                        <button
+                                            class="btn btn-success btn-sm"
+                                            onclick="testHighlight()"
+                                        >
+                                            <i class="bi bi-highlighter"></i> To
+                                            sang tren ban do
+                                        </button>
+                                        <button
+                                            class="btn btn-info btn-sm text-white"
+                                            onclick="testZoomToBounds()"
+                                        >
+                                            <i class="bi bi-zoom-in"></i> Phong
+                                            to den vung
+                                        </button>
+                                        <button
+                                            class="btn btn-outline-danger btn-sm"
+                                            onclick="clearHighlights()"
+                                        >
+                                            <i class="bi bi-eraser"></i> Xoa to
+                                            sang
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quan ly diem -->
+                        <div class="card shadow-sm mb-2">
+                            <div
+                                class="card-header py-1"
+                                role="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#pointPanel"
+                            >
+                                <h6 class="mb-0 small">
+                                    <i class="bi bi-geo-fill text-danger"></i>
+                                    Quan ly diem
+                                </h6>
+                            </div>
+                            <div class="collapse" id="pointPanel">
+                                <div class="card-body">
+                                    <div
+                                        id="pointListContainer"
+                                        class="mb-2"
+                                    ></div>
+                                    <div class="row g-1 mb-2">
+                                        <div class="col-6">
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                class="form-control form-control-sm"
+                                                id="pointLat"
+                                                placeholder="Vi do"
+                                            />
+                                        </div>
+                                        <div class="col-6">
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                class="form-control form-control-sm"
+                                                id="pointLng"
+                                                placeholder="Kinh do"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm"
+                                            id="pointName"
+                                            placeholder="Ten diem"
+                                        />
+                                    </div>
+                                    <div class="d-grid gap-1">
+                                        <button
+                                            class="btn btn-danger btn-sm"
+                                            onclick="addCustomPoint()"
+                                        >
+                                            <i class="bi bi-plus-circle"></i>
+                                            Them diem
+                                        </button>
+                                        <div class="btn-group btn-group-sm">
+                                            <button
+                                                class="btn btn-outline-secondary"
+                                                onclick="toggleAllPoints()"
+                                            >
+                                                <i class="bi bi-eye"></i>
+                                                An/Hien
+                                            </button>
+                                            <button
+                                                class="btn btn-outline-secondary"
+                                                onclick="zoomAllPoints()"
+                                            >
+                                                <i
+                                                    class="bi bi-arrows-fullscreen"
+                                                ></i>
+                                                Xem tat ca
+                                            </button>
+                                            <button
+                                                class="btn btn-outline-danger"
+                                                onclick="clearAllPoints()"
+                                            >
+                                                <i class="bi bi-trash"></i> Xoa
+                                                het
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bootstrap 5 JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+        <script src="assets/js/http-request/fetch.js"></script>
+        <script src="assets/js/auto-fill/fill-select.js"></script>
+        <script src="assets/js/province-commune-select/events.js"></script>
+        <script src="assets/js/province-commune-select/load-fill.js"></script>
+
+        <script>
+            // ========================================
+            // BIEN TOAN CUC
+            // ========================================
+            function uniqid(prefix = "", moreEntropy = false) {
+                const sec = Date.now() * 1000 + Math.random() * 1000;
+                const id = sec.toString(16).replace(/\./g, "").padEnd(14, "0");
+                return `${prefix}${id}${moreEntropy ? "." + Math.trunc(Math.random() * 100000000) : ""}`;
+            }
+
+            const filterScope = {
+                province_c: null,
+                commune_c: null,
+            };
+
+            const WMS_RANHGIOI = [
+                "ws_ranhgioi:rg_vn_tinh_2025",
+                "ws_ranhgioi:rg_vn_xa_2025",
+            ];
+
+            const WMS_URL_RANHGIOI =
+                "https://bando.ifee.edu.vn:8453/geoserver/ws_ranhgioi/wms";
+
+            const DEFAULT_WMS_LAYERS = [
+                {
+                    id: uniqid("wms_id_", true),
+                    name: "Ranh gioi tinh",
+                    url: WMS_URL_RANHGIOI,
+                    layer: "ws_ranhgioi:rg_vn_tinh_2025",
+                    version: "1.1.1",
+                    defaultVisible: true,
+                    zoomPriority: 10,
+                    zIndex: 1,
+                },
+                {
+                    id: uniqid("wms_id_", true),
+                    name: "Ranh gioi xa",
+                    url: WMS_URL_RANHGIOI,
+                    layer: "ws_ranhgioi:rg_vn_xa_2025",
+                    version: "1.1.1",
+                    defaultVisible: false,
+                    zoomPriority: 9,
+                    zIndex: 1,
+                },
+            ];
+
+            // ========================================
+            // KHOI TAO BAN DO
+            // ========================================
+            const basemapHybrid = L.tileLayer(
+                "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+                { maxZoom: 20, attribution: "" },
+            );
+
+            const map = L.map("map", {
+                center: [21.0245, 105.85],
+                zoom: 6,
+                layers: [basemapHybrid],
+            });
+
+            // ========================================
+            // KHOI TAO MANAGERS
+            // ========================================
+            const wmsManager = new WMSLayerManager(map, DEFAULT_WMS_LAYERS);
+            const pointManager = new PointManager(map, {
+                enableDefaultPoints: true,
+                defaultIconSize: 32,
+                popupEnabled: true,
+            });
+
+            // Render WMS list + load mac dinh
+            wmsManager.initializeWMSList(
+                document.getElementById("wmsListContainer"),
+            );
+            wmsManager.loadDefaultWMSLayers();
+
+            // Click ban do -> GetFeatureInfo
+            map.on("click", (event) => {
+                wmsManager.handleMapClick(event);
+            });
+
+            // ========================================
+            // LOC TINH / XA -> CQL FILTER -> WMS
+            // ========================================
+            // Xu ly chon tinh
+            document
+                .getElementById("province_code")
+                .addEventListener("change", async (e) => {
+                    const provinceCode = Number(e.target.value);
+
+                    // Cap nhat filterScope
+                    filterScope.province_c = provinceCode || null;
+                    filterScope.commune_c = null;
+
+                    // Reset select xa
+                    await loadCommuneListByProvince(provinceCode);
+
+                    // Xoa highlight cu
+                    clearHighlights();
+
+                    if (provinceCode) {
+                        // Cap nhat WMS ranh gioi tinh voi CQL filter
+                        const cqlTinh = `matinh=${provinceCode}`;
+                        console.log("Updating WMS layer for province with CQL:", cqlTinh);
+                        await wmsManager.updateWMSLayer(
+                            "ws_ranhgioi:rg_vn_tinh_2025",
+                            cqlTinh,
+                            true,
+                        );
+
+                        // Bat lop ranh gioi xa voi CQL filter cung tinh
+                        const cqlXa = `matinh=${provinceCode}`;
+                        console.log("Updating WMS layer for commune with CQL:", cqlXa);
+                        await wmsManager.updateWMSLayer(
+                            "ws_ranhgioi:rg_vn_xa_2025",
+                            cqlXa,
+                            false,
+                        );
+                    } else {
+                        // Reset ve mac dinh: ranh tinh khong filter, an ranh xa
+                        await wmsManager.updateWMSLayer(
+                            "ws_ranhgioi:rg_vn_tinh_2025",
+                            null,
+                            false,
+                        );
+
+                        // Xoa ranh xa
+                        const xaConfig = wmsManager.getWmsConfigWithNameLayer(
+                            "ws_ranhgioi:rg_vn_xa_2025",
+                        );
+                        if (xaConfig) wmsManager.removeWMSLayer(xaConfig.id);
+                    }
+                });
+
+            // Xu ly chon xa
+            document
+                .getElementById("commune_code")
+                .addEventListener("change", async (e) => {
+                    const communeCode = Number(e.target.value);
+
+                    // Cap nhat filterScope
+                    filterScope.commune_c = communeCode || null;
+
+                    // Xoa highlight cu
+                    clearHighlights();
+
+                    if (communeCode) {
+                        // Cap nhat WMS ranh gioi xa voi CQL filter theo xa
+                        const cqlXa = `maxa=${communeCode}`;
+                        await wmsManager.updateWMSLayer(
+                            "ws_ranhgioi:rg_vn_xa_2025",
+                            cqlXa,
+                            true,
+                        );
+
+                        // Highlight ranh xa
+                        await wmsManager.highlightSelectedFeature(
+                            wmsManager.getWmsConfigWithNameLayer(
+                                "ws_ranhgioi:rg_vn_xa_2025",
+                            ),
+                            cqlXa,
+                        );
+                    } else if (filterScope.province_c) {
+                        // Quay lai hien tat ca xa cua tinh
+                        const cqlXa = `matinh=${filterScope.province_c}`;
+                        await wmsManager.updateWMSLayer(
+                            "ws_ranhgioi:rg_vn_xa_2025",
+                            cqlXa,
+                            false,
+                        );
+
+                        // Zoom lai ve tinh
+                        const cqlTinh = `matinh=${filterScope.province_c}`;
+                        await wmsManager.zoomToFilteredExtent(
+                            WMS_URL_RANHGIOI,
+                            "ws_ranhgioi:rg_vn_tinh_2025",
+                            cqlTinh,
+                        );
+                    }
+                });
+
+            // Reset bo loc
+            function resetFilter() {
+                document.getElementById("province_code").value = "";
+                document.getElementById("commune_code").value = "";
+                fillSelect(
+                    "commune_code",
+                    [],
+                    "code",
+                    "name",
+                    "[Chon xa/phuong]",
+                );
+
+                filterScope.province_c = null;
+                filterScope.commune_c = null;
+
+                clearHighlights();
+
+                // Reset WMS layers
+                wmsManager.updateWMSLayer(
+                    "ws_ranhgioi:rg_vn_tinh_2025",
+                    null,
+                    false,
+                );
+                const xaConfig = wmsManager.getWmsConfigWithNameLayer(
+                    "ws_ranhgioi:rg_vn_xa_2025",
+                );
+                if (xaConfig) wmsManager.removeWMSLayer(xaConfig.id);
+
+                map.flyTo([21.0245, 105.85], 6, { duration: 0.5 });
+            }
+
+            // Load danh sach tinh khi trang tai xong
+            loadProvinceList();
+
+            // ========================================
+            // TRUY VAN WFS (test)
+            // ========================================
+            let lastFetchedGeoJSON = null;
+
+            async function testFetchGeoJSON() {
+                const layerName = document.getElementById("layerName").value;
+                const cqlFilter =
+                    document.getElementById("cqlFilter").value || null;
+                const maxFeatures =
+                    parseInt(document.getElementById("maxFeatures").value) ||
+                    10;
+
+                const wfsUrl =
+                    wmsManager.wfsUtil.generateWFSUrl(WMS_URL_RANHGIOI);
+
+                try {
+                    const geojson =
+                        await wmsManager.wfsUtil.fetchFeatureGeoJSON(
+                            wfsUrl,
+                            layerName,
+                            cqlFilter,
+                            maxFeatures,
+                        );
+                    lastFetchedGeoJSON = geojson;
+                } catch (error) {
+                    console.error("Loi:", error);
+                }
+            }
+
+            async function testHighlight() {
+                if (!lastFetchedGeoJSON) return;
+                wmsManager.wfsUtil.highlightPolygonOnMap(
+                    map,
+                    lastFetchedGeoJSON,
+                    "testHighlight",
+                );
+            }
+
+            function testZoomToBounds() {
+                if (
+                    !lastFetchedGeoJSON ||
+                    !lastFetchedGeoJSON.features ||
+                    lastFetchedGeoJSON.features.length === 0
+                )
+                    return;
+                const bounds = wmsManager.wfsUtil.calculateBounds(
+                    lastFetchedGeoJSON.features,
+                );
+                map.fitBounds(
+                    [
+                        [bounds.ymin, bounds.xmin],
+                        [bounds.ymax, bounds.xmax],
+                    ],
+                    { padding: [20, 20] },
+                );
+            }
+
+            function clearHighlights() {
+                if (map._highlightLayers) {
+                    Object.keys(map._highlightLayers).forEach((key) => {
+                        map.removeLayer(map._highlightLayers[key]);
+                        delete map._highlightLayers[key];
+                    });
+                }
+            }
+
+            // ========================================
+            // QUAN LY DIEM
+            // ========================================
+            function renderPointList() {
+                const container = document.getElementById("pointListContainer");
+                const points = pointManager.getAllPoints();
+                if (points.length === 0) {
+                    container.innerHTML =
+                        '<div class="text-muted small text-center py-1">Chua co diem nao</div>';
+                    return;
+                }
+                let html =
+                    '<div class="list-group list-group-flush" style="font-size:0.8rem;">';
+                points.forEach(({ pointId, config }) => {
+                    html += `<div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                    <span class="text-truncate me-1" style="max-width:120px;" title="${config.name}">${config.name}</span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary py-0 px-1" onclick="pointManager.zoomToPoint('${pointId}', 8)" title="Phong to"><i class="bi bi-search"></i></button>
+                        <button class="btn btn-outline-danger py-0 px-1" onclick="removeAndRefresh('${pointId}')" title="Xoa"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                </div>`;
+                });
+                html += "</div>";
+                container.innerHTML = html;
+            }
+            renderPointList();
+
+            function addCustomPoint() {
+                const lat = parseFloat(
+                    document.getElementById("pointLat").value,
+                );
+                const lng = parseFloat(
+                    document.getElementById("pointLng").value,
+                );
+                const name =
+                    document.getElementById("pointName").value ||
+                    `Diem ${pointManager.points.size + 1}`;
+
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                const id = pointManager.addPoint({
+                    name,
+                    latitude: lat,
+                    longitude: lng,
+                    description: `<div class="text-center"><strong>${name}</strong><br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small></div>`,
+                });
+
+                if (id) {
+                    renderPointList();
+                    document.getElementById("pointLat").value = "";
+                    document.getElementById("pointLng").value = "";
+                    document.getElementById("pointName").value = "";
+                }
+            }
+
+            function removeAndRefresh(pointId) {
+                const point = pointManager.getPoint(pointId);
+                pointManager.removePoint(pointId);
+                renderPointList();
+            }
+
+            function toggleAllPoints() {
+                pointManager.toggleLayerVisibility();
+            }
+
+            function zoomAllPoints() {
+                if (pointManager.points.size === 0) return;
+                pointManager.zoomToAllPoints();
+            }
+
+            function clearAllPoints() {
+                pointManager.clearAllPoints();
+                renderPointList();
+            }
+        </script>
+    </body>
+</html>
