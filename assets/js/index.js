@@ -71,11 +71,6 @@ const pointManager = new PointManager(map, {
 wmsManager.initializeWMSList(document.getElementById("wmsListContainer"));
 wmsManager.loadDefaultWMSLayers();
 
-// Click ban do -> GetFeatureInfo
-map.on("click", (event) => {
-    wmsManager.handleMapClick(event);
-});
-
 // ========================================
 // LOC TINH / XA -> CQL FILTER -> WMS
 // ========================================
@@ -330,4 +325,45 @@ function zoomAllPoints() {
 function clearAllPoints() {
     pointManager.clearAllPoints();
     renderPointList();
+}
+
+// ========================================
+// SKETCH MANAGER - MODULE 4
+// ========================================
+const sketchManager = new SketchManager(map, {
+    enableSave: true,
+    enableMerge: true,
+    enableSplit: true,
+    apiEndpoint: "/api/polygons/save",
+    redirectAfterSave: false,
+});
+
+sketchManager.initialize();
+
+// ========================================
+// WFS CLICK HANDLER - Che do GetFeatureInfo
+// ========================================
+const wfsClickHandler = (event) => {
+    wmsManager.handleMapClick(event);
+};
+
+// Register handler with sketch manager so it can be disabled/restored
+sketchManager.setWFSClickHandler(wfsClickHandler);
+
+// Initially attach WFS click handler
+map.on("click", wfsClickHandler);
+
+function toggleSketchMode() {
+    const isVisible = sketchManager.toggle();
+    const btn = document.getElementById("sketch-toggle-btn");
+
+    if (isVisible) {
+        btn.classList.remove("btn-warning");
+        btn.classList.add("btn-info");
+        btn.innerHTML = '<i class="bi bi-pencil"></i> Tat sketch tools';
+    } else {
+        btn.classList.remove("btn-info");
+        btn.classList.add("btn-warning");
+        btn.innerHTML = '<i class="bi bi-pencil"></i> Bat sketch tools';
+    }
 }
