@@ -213,7 +213,7 @@
                                             type="text"
                                             class="form-control form-control-sm"
                                             id="cqlFilter"
-                                            placeholder="VD: province_c='01'"
+                                            placeholder="VD: matinh='01'"
                                         />
                                     </div>
                                     <div class="mb-2">
@@ -447,7 +447,7 @@
             document
                 .getElementById("province_code")
                 .addEventListener("change", async (e) => {
-                    const provinceCode = Number(e.target.value);
+                    const provinceCode = e.target.value;
 
                     // Cap nhat filterScope
                     filterScope.province_c = provinceCode || null;
@@ -461,8 +461,7 @@
 
                     if (provinceCode) {
                         // Cap nhat WMS ranh gioi tinh voi CQL filter
-                        const cqlTinh = `matinh=${provinceCode}`;
-                        console.log("Updating WMS layer for province with CQL:", cqlTinh);
+                        const cqlTinh = `matinh='${provinceCode}'`;
                         await wmsManager.updateWMSLayer(
                             "ws_ranhgioi:rg_vn_tinh_2025",
                             cqlTinh,
@@ -470,8 +469,7 @@
                         );
 
                         // Bat lop ranh gioi xa voi CQL filter cung tinh
-                        const cqlXa = `matinh=${provinceCode}`;
-                        console.log("Updating WMS layer for commune with CQL:", cqlXa);
+                        const cqlXa = `matinh='${provinceCode}'`;
                         await wmsManager.updateWMSLayer(
                             "ws_ranhgioi:rg_vn_xa_2025",
                             cqlXa,
@@ -497,7 +495,7 @@
             document
                 .getElementById("commune_code")
                 .addEventListener("change", async (e) => {
-                    const communeCode = Number(e.target.value);
+                    const communeCode = e.target.value;
 
                     // Cap nhat filterScope
                     filterScope.commune_c = communeCode || null;
@@ -507,7 +505,7 @@
 
                     if (communeCode) {
                         // Cap nhat WMS ranh gioi xa voi CQL filter theo xa
-                        const cqlXa = `maxa=${communeCode}`;
+                        const cqlXa = `maxa='${communeCode}'`;
                         await wmsManager.updateWMSLayer(
                             "ws_ranhgioi:rg_vn_xa_2025",
                             cqlXa,
@@ -523,7 +521,7 @@
                         );
                     } else if (filterScope.province_c) {
                         // Quay lai hien tat ca xa cua tinh
-                        const cqlXa = `matinh=${filterScope.province_c}`;
+                        const cqlXa = `matinh='${filterScope.province_c}'`;
                         await wmsManager.updateWMSLayer(
                             "ws_ranhgioi:rg_vn_xa_2025",
                             cqlXa,
@@ -531,7 +529,7 @@
                         );
 
                         // Zoom lai ve tinh
-                        const cqlTinh = `matinh=${filterScope.province_c}`;
+                        const cqlTinh = `matinh='${filterScope.province_c}'`;
                         await wmsManager.zoomToFilteredExtent(
                             WMS_URL_RANHGIOI,
                             "ws_ranhgioi:rg_vn_tinh_2025",

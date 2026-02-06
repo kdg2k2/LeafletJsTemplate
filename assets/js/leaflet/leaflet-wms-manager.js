@@ -664,7 +664,12 @@ class WMSLayerManager {
                 [bounds.ymin, bounds.xmin],
                 [bounds.ymax, bounds.xmax],
             ],
-            { padding: [20, 20] },
+            {
+                padding: [20, 20],
+                animate: true, // bật animation
+                duration: 1, // thời gian (giây)
+                easeLinearity: 0.25, // độ mượt (0 → 1)
+            },
         );
     }
 
