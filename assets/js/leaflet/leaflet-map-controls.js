@@ -225,6 +225,7 @@ class SidebarLayoutManager {
      * @private
      */
     _setupDefaultLayout() {
+        // Sidebar element should already exist (created by MapApp._ensureSidebarElement)
         const sidebarContent = document.getElementById(this.sidebarContentId);
         const offcanvasBody = document.getElementById(
             `${this.offcanvasId}-body`
@@ -232,8 +233,13 @@ class SidebarLayoutManager {
         const mapCol = document.getElementById(this.mapColId);
         const sidebarCol = document.getElementById(this.sidebarColId);
 
-        if (!sidebarContent || !offcanvasBody) {
-            console.error("Sidebar content or offcanvas body not found");
+        if (!sidebarContent) {
+            console.error(`Sidebar element #${this.sidebarContentId} not found. Ensure _ensureSidebarElement() runs before _initMapControls().`);
+            return;
+        }
+
+        if (!offcanvasBody) {
+            console.error("Offcanvas body not found");
             return;
         }
 

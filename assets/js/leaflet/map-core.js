@@ -88,11 +88,29 @@ class MapApp {
 
     async init() {
         this._initMap();
+        this._ensureSidebarElement(); // Create sidebar element first
         this._initSidebar();
         this._initMapControls();
         this._initManagers();
         this._attachEventListeners();
         await this._loadInitialData();
+    }
+
+    /**
+     * Ensure sidebar element exists before initializing panels
+     * @private
+     */
+    _ensureSidebarElement() {
+        const sidebarConfig = this.config.sidebar;
+        if (!sidebarConfig?.containerId) return;
+
+        let sidebarElement = document.getElementById(sidebarConfig.containerId);
+        if (!sidebarElement) {
+            sidebarElement = document.createElement("div");
+            sidebarElement.id = sidebarConfig.containerId;
+            // Append to layout parent temporarily (will be moved by SidebarLayoutManager)
+            this._getLayoutParent().appendChild(sidebarElement);
+        }
     }
 
     /**
@@ -970,6 +988,14 @@ class MapApp {
         if (this.sidebarLayoutManager) {
             this.sidebarLayoutManager.destroy();
             this.sidebarLayoutManager = null;
+        }
+
+        // Cleanup sidebar element if still exists (created by _ensureSidebarElement)
+        if (this.config.sidebar?.containerId) {
+            const sidebarEl = document.getElementById(this.config.sidebar.containerId);
+            if (sidebarEl) {
+                sidebarEl.remove();
+            }
         }
 
         if (this._mapControlButtons && this.map) {
