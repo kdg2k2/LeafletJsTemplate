@@ -641,7 +641,7 @@ class WMSLayerManager {
                 wfsUrl,
                 layerName,
                 cqlFilter,
-                100,
+                5,
             );
 
             if (geojson && geojson.features && geojson.features.length > 0) {
