@@ -103,6 +103,36 @@ const makeHttpRequest = (
 const apiRequest = async (method, url, params = {}, csrfToken = "") => {
     return await makeHttpRequest(method, url, params, csrfToken);
 };
+
+/**
+ * Simple fetch for external APIs without credentials
+ * This avoids CORS issues with wildcard Access-Control-Allow-Origin: *
+ */
+const externalApiRequest = async (url, params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const fullUrl = queryString ? `${url}?${queryString}` : url;
+
+    try {
+        const response = await fetch(fullUrl, {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+            },
+            // No credentials for external API to avoid CORS issues
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("External API fetch error:", error);
+        throw error;
+    }
+};
+
 class HttpIntant {
     async get(url, data, csrfToken) {
         return apiRequest("GET", url, data, csrfToken);
@@ -133,6 +163,13 @@ class HttpIntant {
             data = { ...data, _method: "PATCH" };
         }
         return apiRequest("POST", url, data, csrfToken);
+    }
+    /**
+     * GET request for external APIs without credentials
+     * Use this for 3rd party APIs to avoid CORS issues
+     */
+    async getExternal(url, params = {}) {
+        return externalApiRequest(url, params);
     }
 }
 const http = new HttpIntant();

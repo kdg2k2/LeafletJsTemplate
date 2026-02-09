@@ -33,16 +33,19 @@ window.mapApp = mapApp;
  * Add a custom point from form inputs
  * Called from HTML button onclick
  */
-function addCustomPoint() {
+async function addCustomPoint() {
     const coord1 = parseFloat(document.getElementById("pointCoord1").value);
     const coord2 = parseFloat(document.getElementById("pointCoord2").value);
     const name = document.getElementById("pointName").value || "";
     const coordSystemSelect = document.getElementById("pointCoordSystem");
-    const coordSystem = coordSystemSelect
-        ? coordSystemSelect.value
-        : "EPSG:4326";
+    const coordSystem = coordSystemSelect ? coordSystemSelect.value : "WGS84";
 
-    const id = mapApp.addPointWithCoordSystem(coord1, coord2, name, coordSystem);
+    const id = await mapApp.addPointWithCoordSystem(
+        coord1,
+        coord2,
+        name,
+        coordSystem,
+    );
 
     if (id) {
         // Clear form
@@ -84,7 +87,7 @@ function handleCoordSystemChange() {
     if (!selectElement) return;
 
     const selectedValue = selectElement.value;
-    const isWGS84 = selectedValue === "EPSG:4326";
+    const isWGS84 = selectedValue === "WGS84";
 
     // Update labels
     const label1 = document.getElementById("pointCoord1Label");
@@ -102,10 +105,10 @@ function handleCoordSystemChange() {
     const input2 = document.getElementById("pointCoord2");
 
     if (input1) {
-        input1.placeholder = isWGS84 ? "VD: 105.8542" : "VD: 500000";
+        input1.placeholder = isWGS84 ? "VD: 105.8542" : "VD: 580000";
     }
     if (input2) {
-        input2.placeholder = isWGS84 ? "VD: 21.0285" : "VD: 2300000";
+        input2.placeholder = isWGS84 ? "VD: 21.0285" : "VD: 2330000";
     }
 
     // Store current system in mapApp
@@ -122,19 +125,13 @@ function initCoordSystemSelect() {
     // Clear existing options
     selectElement.innerHTML = "";
 
-    // Add WGS84 option
-    const wgs84Option = document.createElement("option");
-    wgs84Option.value = "EPSG:4326";
-    wgs84Option.textContent = "WGS84 (Kinh/Vi do)";
-    selectElement.appendChild(wgs84Option);
-
-    // Add VN2000 zones
-    const zones = mapApp.getVN2000Zones();
-    zones.forEach((zone) => {
-        const option = document.createElement("option");
-        option.value = `EPSG:${zone.epsg_code}`;
-        option.textContent = `${zone.zone_name} (${zone.provinces})`;
-        selectElement.appendChild(option);
+    // Get options from mapApp
+    const options = mapApp.getCoordSystemOptions();
+    options.forEach((option) => {
+        const optionElement = document.createElement("option");
+        optionElement.value = option.value;
+        optionElement.textContent = option.label;
+        selectElement.appendChild(optionElement);
     });
 
     // Add change event listener

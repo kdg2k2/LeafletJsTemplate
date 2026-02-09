@@ -57,7 +57,7 @@ class MapApp {
         this.coordConverter = new CoordinateConverter();
 
         // Current coordinate system
-        this.currentCoordSystem = "EPSG:4326"; // Default to WGS84
+        this.currentCoordSystem = "WGS84"; // Default to WGS84
 
         // Geolocation watch ID
         this.geolocationWatchId = null;
@@ -120,7 +120,7 @@ class MapApp {
         this.wmsManager = new WMSLayerManager(
             this.map,
             this.wmsLayers,
-            this.config.wms.ranhgioiLayers
+            this.config.wms.ranhgioiLayers,
         );
         if (this.elementIds.wmsListContainer) {
             const container = document.getElementById(
@@ -444,36 +444,63 @@ class MapApp {
     }
 
     /**
-     * Add point with coordinate system conversion
+     * Add point with coordinate system conversion using API
      * @param {number} coord1 - X or Longitude
      * @param {number} coord2 - Y or Latitude
      * @param {string} name - Point name
-     * @param {string} fromEPSG - Source coordinate system EPSG code
-     * @returns {string|null} Point ID or null if failed
+     * @param {string} coordSystemValue - Coordinate system value (WGS84, VN2000_MUI3, VN2000_MUI6)
+     * @returns {Promise<string|null>} Point ID or null if failed
      */
-    addPointWithCoordSystem(coord1, coord2, name, fromEPSG = "EPSG:4326") {
-        // Convert to WGS84 if needed
+    async addPointWithCoordSystem(
+        coord1,
+        coord2,
+        name,
+        coordSystemValue = "WGS84",
+    ) {
+        // Parse coordinate system
+        const coordSys = this.coordConverter.parseCoordSystem(coordSystemValue);
+
         let lat, lng;
 
-        if (fromEPSG === "EPSG:4326") {
+        if (coordSys.type === "WGS84") {
             lng = coord1;
             lat = coord2;
         } else {
-            // Convert from VN2000 to WGS84
-            const converted = this.coordConverter.vn2000ToWGS84(
+            // VN2000: need to convert to WGS84 using API
+            // Auto-suggest central meridian based on map center
+            const mapCenter = this.map.getCenter();
+            const kinhtuyentruc = this.coordConverter.suggestCentralMeridian(
+                mapCenter.lng,
+                coordSys.muichieu,
+            );
+
+            const converted = await this.coordConverter.vn2000ToWGS84(
                 coord1,
                 coord2,
-                fromEPSG,
+                coordSys.muichieu,
+                kinhtuyentruc,
             );
+
             if (!converted) {
                 console.error("Failed to convert coordinates");
+                alert(
+                    "Khong the chuyen doi toa do. Vui long kiem tra lai input.",
+                );
                 return null;
             }
+
             lng = converted.lng;
             lat = converted.lat;
         }
 
-        return this.addPoint(lat, lng, name);
+        const id = this.addPoint(lat, lng, name);
+
+        if (id) {
+            // Zoom to the added point
+            this.zoomToPoint(id, 15);
+        }
+
+        return id;
     }
 
     /**
@@ -512,18 +539,26 @@ class MapApp {
 
     /**
      * Set current coordinate system
-     * @param {string} epsgCode - EPSG code (e.g., "EPSG:4326", "EPSG:5897")
+     * @param {string} systemValue - Coordinate system value (WGS84, VN2000_MUI3, VN2000_MUI6)
      */
-    setCoordinateSystem(epsgCode) {
-        this.currentCoordSystem = epsgCode;
+    setCoordinateSystem(systemValue) {
+        this.currentCoordSystem = systemValue;
     }
 
     /**
      * Get current coordinate system
-     * @returns {string} EPSG code
+     * @returns {string} Coordinate system value
      */
     getCoordinateSystem() {
         return this.currentCoordSystem;
+    }
+
+    /**
+     * Get available coordinate system options
+     * @returns {Array} Array of zone options
+     */
+    getCoordSystemOptions() {
+        return this.coordConverter.getZoneOptions();
     }
 
     /**
@@ -547,23 +582,6 @@ class MapApp {
             coord1: result.x,
             coord2: result.y,
         };
-    }
-
-    /**
-     * Get available VN2000 zones
-     * @returns {Array} Array of zone objects
-     */
-    getVN2000Zones() {
-        return this.coordConverter.getVN2000Zones();
-    }
-
-    /**
-     * Suggest best VN2000 zone for current map center
-     * @returns {Object|null} Zone object
-     */
-    suggestVN2000Zone() {
-        const center = this.map.getCenter();
-        return this.coordConverter.suggestVN2000Zone(center.lng, center.lat);
     }
 
     // ========================================

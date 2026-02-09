@@ -3,135 +3,168 @@
 // ========================================
 
 /**
- * CoordinateConverter - Utility for converting between coordinate systems
- * Requires: proj4.js and vn2000.js to be loaded
+ * CoordinateConverter - Utility for converting between coordinate systems using API
+ * Uses vn2000.vn API for coordinate conversion
+ * Requires: fetch.js (http.getExternal)
  */
 class CoordinateConverter {
     constructor() {
-        this.wgs84 = "EPSG:4326";
-        this.defaultVN2000 = "EPSG:5897"; // VN-2000 / TM-3 105-00 (Hanoi area)
-    }
+        this.apiBaseUrl = "https://vn2000.vn/api";
 
-    /**
-     * Check if proj4 is available
-     * @returns {boolean}
-     */
-    isAvailable() {
-        return typeof proj4 !== "undefined";
-    }
-
-    /**
-     * Convert coordinates from one system to another
-     * @param {number} x - X coordinate (or longitude)
-     * @param {number} y - Y coordinate (or latitude)
-     * @param {string} fromEPSG - Source EPSG code (e.g., "EPSG:4326")
-     * @param {string} toEPSG - Target EPSG code
-     * @returns {Object} {x, y} or null if conversion fails
-     */
-    convert(x, y, fromEPSG, toEPSG) {
-        if (!this.isAvailable()) {
-            console.warn("proj4 is not available");
-            return null;
-        }
-
-        if (isNaN(x) || isNaN(y)) {
-            return null;
-        }
-
-        try {
-            // If same system, return as-is
-            if (fromEPSG === toEPSG) {
-                return { x, y };
-            }
-
-            const result = proj4(fromEPSG, toEPSG, [x, y]);
-            return {
-                x: result[0],
-                y: result[1],
-            };
-        } catch (error) {
-            console.error("Coordinate conversion error:", error);
-            return null;
-        }
-    }
-
-    /**
-     * Convert from VN2000 to WGS84
-     * @param {number} x - VN2000 X (easting)
-     * @param {number} y - VN2000 Y (northing)
-     * @param {string} vn2000EPSG - VN2000 zone EPSG code
-     * @returns {Object} {lng, lat} or null
-     */
-    vn2000ToWGS84(x, y, vn2000EPSG) {
-        const result = this.convert(x, y, vn2000EPSG, this.wgs84);
-        if (!result) return null;
-        return {
-            lng: result.x,
-            lat: result.y,
+        // Central meridians for common VN2000 zones
+        this.centralMeridians = {
+            mui3: {
+                103: 103,
+                104: 104,
+                105: 105,
+                106: 106,
+                107: 107,
+                108: 108,
+            },
+            mui6: {
+                102: 102,
+                105: 105,
+                108: 108,
+            },
         };
     }
 
     /**
-     * Convert from WGS84 to VN2000
-     * @param {number} lng - Longitude
-     * @param {number} lat - Latitude
-     * @param {string} vn2000EPSG - VN2000 zone EPSG code
-     * @returns {Object} {x, y} or null
+     * Get VN2000 zone options for select dropdown
+     * @returns {Array} Array of zone options
      */
-    wgs84ToVN2000(lng, lat, vn2000EPSG) {
-        return this.convert(lng, lat, this.wgs84, vn2000EPSG);
+    getZoneOptions() {
+        return [
+            { value: "WGS84", label: "WGS84 (Kinh/Vi do)" },
+            { value: "VN2000_MUI3", label: "VN2000 Mui 3" },
+            { value: "VN2000_MUI6", label: "VN2000 Mui 6" },
+        ];
     }
 
     /**
-     * Get all available VN2000 zones
-     * @returns {Array}
+     * Parse coordinate system from select value
+     * @param {string} systemValue - Value from select (e.g., "VN2000_MUI3")
+     * @returns {Object} {type, muichieu, kinhtuyentruc}
      */
-    getVN2000Zones() {
-        if (typeof VN2000_ZONES === "undefined") {
-            return [];
+    parseCoordSystem(systemValue) {
+        if (systemValue === "WGS84") {
+            return { type: "WGS84" };
         }
-        return VN2000_ZONES;
+
+        if (systemValue === "VN2000_MUI3") {
+            return { type: "VN2000", muichieu: 3 };
+        }
+
+        if (systemValue === "VN2000_MUI6") {
+            return { type: "VN2000", muichieu: 6 };
+        }
+
+        return { type: "WGS84" };
     }
 
     /**
-     * Find VN2000 zone by EPSG code
-     * @param {number} epsgCode
-     * @returns {Object|null}
-     */
-    findZoneByEPSG(epsgCode) {
-        const zones = this.getVN2000Zones();
-        return zones.find((z) => z.epsg_code === epsgCode) || null;
-    }
-
-    /**
-     * Suggest best VN2000 zone for a WGS84 coordinate
-     * Based on longitude proximity to zone's central meridian
+     * Suggest central meridian based on longitude and zone type
      * @param {number} lng - Longitude
-     * @param {number} lat - Latitude
-     * @returns {Object|null} VN2000 zone object
+     * @param {number} muichieu - Zone type (3 or 6)
+     * @returns {number} Central meridian
      */
-    suggestVN2000Zone(lng, lat) {
-        const zones = this.getVN2000Zones();
-        if (zones.length === 0) return null;
+    suggestCentralMeridian(lng, muichieu = 3) {
+        if (muichieu === 6) {
+            if (lng < 103.5) return 102;
+            if (lng < 106.5) return 105;
+            return 108;
+        } else {
+            // muichieu = 3
+            const options = [103, 104, 105, 106, 107, 108];
+            let closest = options[0];
+            let minDiff = Math.abs(lng - closest);
 
-        let bestZone = null;
-        let minDiff = Infinity;
-
-        zones.forEach((zone) => {
-            // Extract central meridian from proj4 definition
-            const match = zone.proj4_defs.match(/\+lon_0=([\d.]+)/);
-            if (match) {
-                const centralMeridian = parseFloat(match[1]);
-                const diff = Math.abs(lng - centralMeridian);
-
+            for (const meridian of options) {
+                const diff = Math.abs(lng - meridian);
                 if (diff < minDiff) {
                     minDiff = diff;
-                    bestZone = zone;
+                    closest = meridian;
                 }
             }
-        });
 
-        return bestZone;
+            return closest;
+        }
+    }
+
+    /**
+     * Convert from VN2000 to WGS84 using API
+     * @param {number} x - VN2000 X (easting)
+     * @param {number} y - VN2000 Y (northing)
+     * @param {number} muichieu - Zone type (3 or 6)
+     * @param {number} kinhtuyentruc - Central meridian
+     * @returns {Promise<Object>} {lng, lat} or null
+     */
+    async vn2000ToWGS84(x, y, muichieu, kinhtuyentruc) {
+        if (isNaN(x) || isNaN(y)) {
+            console.error("Invalid coordinates");
+            return null;
+        }
+
+        try {
+            const apiUrl = `${this.apiBaseUrl}/vn2000sangwgs84`;
+            const response = await http.getExternal(apiUrl, {
+                x: x,
+                y: y,
+                muichieu: muichieu,
+                kinhtuyentruc: kinhtuyentruc,
+            });
+
+            if (response.success && response.data) {
+                return {
+                    lng: response.data.kinhdo || response.data.lng,
+                    lat: response.data.vido || response.data.lat,
+                };
+            }
+
+            console.error("API conversion failed:", response.message);
+            return null;
+        } catch (error) {
+            console.error("VN2000 to WGS84 conversion error:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Convert from WGS84 to VN2000 using API
+     * @param {number} lng - Longitude
+     * @param {number} lat - Latitude
+     * @param {number} muichieu - Zone type (3 or 6)
+     * @param {number} kinhtuyentruc - Central meridian
+     * @returns {Promise<Object>} {x, y} or null
+     */
+    async wgs84ToVN2000(lng, lat, muichieu, kinhtuyentruc) {
+        if (isNaN(lng) || isNaN(lat)) {
+            console.error("Invalid coordinates");
+            return null;
+        }
+
+        try {
+            const apiUrl = `${this.apiBaseUrl}/wgs84sangvn2000`;
+            const response = await http.getExternal(apiUrl, {
+                vido: lat,
+                kinhdo: lng,
+                muichieu: muichieu,
+                kinhtuyentruc: kinhtuyentruc,
+            });
+
+            if (response.success && response.data) {
+                return {
+                    x: response.data.x,
+                    y: response.data.y,
+                };
+            }
+
+            console.error("API conversion failed:", response.message);
+            return null;
+        } catch (error) {
+            console.error("WGS84 to VN2000 conversion error:", error);
+            return null;
+        }
     }
 
     /**
