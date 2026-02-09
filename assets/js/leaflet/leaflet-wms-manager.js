@@ -121,11 +121,11 @@ class WMSLayerManager {
     }
 
     /**
-     * Sap xep lai thu tu WMS layers theo zoomPriority
+     * Sap xep lai thu tu WMS layers theo zIndex
      */
     reorderWMSLayers() {
         const sortedConfigs = [...this.wmsConfigs].sort(
-            (a, b) => (a.zoomPriority || 0) - (b.zoomPriority || 0),
+            (a, b) => (a.zIndex || 1) - (b.zIndex || 1),
         );
 
         sortedConfigs.forEach((config, index) => {
@@ -134,6 +134,21 @@ class WMSLayerManager {
                 layer.setZIndex((config.zIndex || 1) * 100 + index);
             }
         });
+    }
+
+    /**
+     * Lay danh sach cac WMS config dang hien thi, sap xep theo zIndex giam dan (tren cung truoc)
+     * @returns {Array} Danh sach config
+     */
+    getVisibleConfigsSortedByZIndex() {
+        const visible = [];
+        this.wmsConfigs.forEach((config) => {
+            if (this.wmsLayers.has(config.id)) {
+                visible.push(config);
+            }
+        });
+        visible.sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1));
+        return visible;
     }
 
     /**
@@ -256,7 +271,7 @@ class WMSLayerManager {
     async handleMapClick(event) {
         const latlng = event.latlng;
 
-        // Lay tat ca visible WMS layers, sort theo zoomPriority (cao nhat truoc)
+        // Lay tat ca visible WMS layers, sort theo zIndex (cao nhat truoc = tren cung)
         const visibleLayers = [];
         this.wmsConfigs.forEach((config) => {
             const layer = this.wmsLayers.get(config.id);
@@ -268,8 +283,7 @@ class WMSLayerManager {
         if (visibleLayers.length === 0) return;
 
         visibleLayers.sort(
-            (a, b) =>
-                (b.config.zoomPriority || 0) - (a.config.zoomPriority || 0),
+            (a, b) => (b.config.zIndex || 1) - (a.config.zIndex || 1),
         );
 
         // Hien popup loading

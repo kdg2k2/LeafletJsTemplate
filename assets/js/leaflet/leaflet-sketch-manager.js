@@ -2,6 +2,8 @@
  * Module 4: SketchManager
  * Quan ly cong cu ve va chinh sua polygon
  * Su dung Leaflet-Geoman va Turf.js
+ *
+ * Fix: selection system, text-stroke labels, real-time measurement update
  */
 class SketchManager {
     constructor(map, options = {}, mapInstance = null) {
@@ -23,6 +25,9 @@ class SketchManager {
         this.measurementLayerGroup = L.featureGroup().addTo(this.map);
         this.measurementLayerGroup._name = "measurementLayer";
 
+        // Selection state
+        this.selectedLayers = new Set();
+
         // State
         this.isSplitMode = false;
         this.selectedPolygonForSplit = null;
@@ -31,11 +36,9 @@ class SketchManager {
         this.polygonCounter = 0;
         this.isWMSSelectionMode = false;
         this.selectedWMSFeature = null;
-        this.disabledWMSLayers = [];
         this.isVisible = false;
         this.toolbar = null;
         this.shouldCheckPolygonCount = true;
-        this.removeClickHandler = null;
         this.currentDrawMode = null;
         this.wfsClickHandler = null;
 
@@ -45,6 +48,11 @@ class SketchManager {
             fillColor: "#e38b4f",
             fillOpacity: 0.8,
             weight: 1,
+        };
+        this.selectedBorderStyle = {
+            color: "#00bfff",
+            weight: 3,
+            dashArray: "6, 4",
         };
         this.mergeStyle = {
             color: "#e38bff",
@@ -74,15 +82,14 @@ class SketchManager {
         ];
     }
 
-    /**
-     * Khoi tao toan bo sketch system
-     */
+    // ========================================
+    // KHOI TAO
+    // ========================================
+
     initialize() {
-        // An sketch layers ban dau
         this.map.removeLayer(this.sketchLayerGroup);
         this.map.removeLayer(this.measurementLayerGroup);
 
-        // Cau hinh Leaflet-Geoman (khong dung controls, se dung custom toolbar)
         if (this.map.pm) {
             this.map.pm.addControls({
                 position: "topright",
@@ -94,13 +101,12 @@ class SketchManager {
                 drawText: false,
                 cutPolygon: false,
                 rotateMode: false,
-                drawPolygon: false, // MAC DINH KHONG VEO VE
-                editMode: false,    // MAC DINH KHONG VEO EDIT
+                drawPolygon: false,
+                editMode: false,
                 dragMode: false,
                 removalMode: false,
             });
 
-            // An toolbar mac dinh
             const toolbars = document.querySelectorAll(".leaflet-pm-toolbar");
             toolbars.forEach((tb) => (tb.style.display = "none"));
         }
@@ -109,169 +115,294 @@ class SketchManager {
         this.setupToolButtons();
     }
 
+    // ========================================
+    // SELECTION SYSTEM (Fix 2-5)
+    // ========================================
+
     /**
-     * Thiet lap event listeners cho ve/chinh sua
+     * Gan click handler cho 1 layer de select/deselect
      */
+    bindSelectionHandler(layer) {
+        layer.on("click", (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (this.currentDrawMode !== null) return;
+            this.toggleLayerSelection(layer);
+        });
+    }
+
+    /**
+     * Toggle select/deselect 1 layer
+     */
+    toggleLayerSelection(layer) {
+        if (this.selectedLayers.has(layer)) {
+            this.deselectLayer(layer);
+        } else {
+            this.selectLayer(layer);
+        }
+        this.updateToolButtonsState();
+    }
+
+    /**
+     * Select 1 layer
+     */
+    selectLayer(layer) {
+        this.selectedLayers.add(layer);
+        this._applySelectedStyle(layer);
+    }
+
+    /**
+     * Deselect 1 layer
+     */
+    deselectLayer(layer) {
+        this.selectedLayers.delete(layer);
+        this._removeSelectedStyle(layer);
+    }
+
+    /**
+     * Deselect tat ca
+     */
+    clearSelection() {
+        this.selectedLayers.forEach((layer) => {
+            this._removeSelectedStyle(layer);
+        });
+        this.selectedLayers.clear();
+        this.updateToolButtonsState();
+    }
+
+    _applySelectedStyle(layer) {
+        // Voi L.geoJSON, layer la 1 group -> duyet sublayers
+        const apply = (l) => {
+            if (l.setStyle) {
+                l._originalStyle = l._originalStyle || {
+                    color: l.options.color,
+                    weight: l.options.weight,
+                    dashArray: l.options.dashArray || null,
+                };
+                l.setStyle(this.selectedBorderStyle);
+            }
+        };
+        if (layer.eachLayer) {
+            layer.eachLayer(apply);
+        } else {
+            apply(layer);
+        }
+    }
+
+    _removeSelectedStyle(layer) {
+        const restore = (l) => {
+            if (l.setStyle && l._originalStyle) {
+                l.setStyle(l._originalStyle);
+                delete l._originalStyle;
+            }
+        };
+        if (layer.eachLayer) {
+            layer.eachLayer(restore);
+        } else {
+            restore(layer);
+        }
+    }
+
+    // ========================================
+    // EVENTS
+    // ========================================
+
     setupSketchEvents() {
         // Event khi ve xong polygon
         this.map.on("pm:create", (e) => {
             if (!this.isVisible || !e.layer) return;
-
-            // Xoa tat ca polygon cu
-            this.sketchLayerGroup.clearLayers();
-            this.measurementLayerGroup.clearLayers(); // Xoa measurement cu
 
             if (window.filterScope) {
                 filterScope.tt = null;
                 delete filterScope.id;
             }
 
-            // Set style
             e.layer.setStyle(this.fillStyle);
-            e.layer.pm.enable();
 
             // Gan attributes
             e.layer._polygonId = this.generateUniquePolygonId();
             e.layer._isSaved = false;
             e.layer._createdAt = new Date().toISOString();
 
-            // Them vao sketchLayerGroup
             this.sketchLayerGroup.addLayer(e.layer);
+            this.bindSelectionHandler(e.layer);
 
-            // Them label dien tich va chieu dai canh
-            this.addMeasurementLabels(e.layer);
+            // Them measurement labels
+            this.updateAllMeasurements();
 
             this.trackChanges();
+
+            // Chuyen ve pointer mode sau khi ve xong (Fix 1)
+            this.setDrawMode(null);
         });
+    }
 
-        // Event khi chinh sua polygon
-        this.map.on("pm:edit", (e) => {
-            if (!this.isVisible || !e.layer) return;
+    // ========================================
+    // MEASUREMENT LABELS (Fix 6 + 7)
+    // ========================================
 
-            if (e.layer._isSaved) {
-                e.layer._isModified = true;
-            }
-
-            // Cap nhat measurement labels
-            this.measurementLayerGroup.clearLayers();
-            this.addMeasurementLabels(e.layer);
-
-            this.trackChanges();
-        });
-
-        // Event khi xoa polygon
-        this.map.on("pm:remove", (e) => {
-            if (!this.isVisible || !e.layer) return;
-
-            this.sketchLayerGroup.removeLayer(e.layer);
-            this.measurementLayerGroup.clearLayers();
-            this.trackChanges();
+    /**
+     * Cap nhat measurement cho tat ca layers
+     */
+    updateAllMeasurements() {
+        this.measurementLayerGroup.clearLayers();
+        this.sketchLayerGroup.eachLayer((layer) => {
+            this.addMeasurementLabels(layer);
         });
     }
 
     /**
      * Them label dien tich va chieu dai canh
+     * Fix 6: dung text-shadow (buffer trang) thay vi background trang
      */
     addMeasurementLabels(layer) {
         try {
-            const geojson = layer.toGeoJSON();
-
-            if (geojson.geometry.type !== "Polygon") {
+            let geojson;
+            if (typeof layer.toGeoJSON === "function") {
+                geojson = layer.toGeoJSON();
+            } else {
                 return;
             }
 
-            const coords = geojson.geometry.coordinates[0];
+            // Xu ly FeatureCollection (L.geoJSON tao ra)
+            let features = [];
+            if (geojson.type === "FeatureCollection") {
+                features = geojson.features;
+            } else if (geojson.type === "Feature") {
+                features = [geojson];
+            }
 
-            // Tinh dien tich (m2 -> ha)
-            const areaM2 = turf.area(geojson);
-            const areaHa = areaM2 / 10000;
+            features.forEach((feature) => {
+                if (!feature.geometry || feature.geometry.type !== "Polygon") return;
 
-            // Tinh center
-            const centerPoint = turf.centroid(geojson);
-            const center = [centerPoint.geometry.coordinates[1], centerPoint.geometry.coordinates[0]];
+                const coords = feature.geometry.coordinates[0];
+                const areaM2 = turf.area(feature);
+                const areaHa = areaM2 / 10000;
 
-            // Tao markerGroup de hien thi dien tich o center
-            const areaLabel = document.createElement("div");
-            areaLabel.style.cssText = `
-                background: white;
-                padding: 6px 10px;
-                border-radius: 4px;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                font-weight: bold;
-                font-size: 12px;
-                min-width: 60px;
-                text-align: center;
-                color: #333;
-            `;
-            areaLabel.innerHTML = `${areaHa.toFixed(2)}<br/><small>hectare</small>`;
+                // Label dien tich o trung tam
+                const centerPoint = turf.centroid(feature);
+                const center = [
+                    centerPoint.geometry.coordinates[1],
+                    centerPoint.geometry.coordinates[0],
+                ];
 
-            // Marker at center hien thi dien tich
-            const areaMarker = L.marker(center, {
-                icon: L.divIcon({
-                    html: areaLabel,
-                    className: "area-label-marker",
-                    iconSize: [80, 50],
-                }),
-                interactive: false,
-            });
-            this.measurementLayerGroup.addLayer(areaMarker);
+                const textStroke =
+                    "-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, " +
+                    "0 -1px 0 #fff, 0 1px 0 #fff, -1px 0 0 #fff, 1px 0 0 #fff";
 
-            // Hien thi chieu dai canh (optional - chi show khi co nhieu canh)
-            if (coords.length > 3) {
-                for (let i = 0; i < coords.length - 1; i++) {
-                    const from = turf.point([coords[i][0], coords[i][1]]);
-                    const to = turf.point([coords[i + 1][0], coords[i + 1][1]]);
+                const areaLabel = document.createElement("div");
+                areaLabel.style.cssText = `
+                    font-weight: bold;
+                    font-size: 13px;
+                    text-align: center;
+                    color: #222;
+                    text-shadow: ${textStroke};
+                    pointer-events: none;
+                `;
+                areaLabel.innerHTML = `${areaHa.toFixed(2)} ha`;
 
-                    // Tinh khoang cach (meters)
-                    const distance = turf.distance(from, to, { units: "meters" });
+                const areaMarker = L.marker(center, {
+                    icon: L.divIcon({
+                        html: areaLabel,
+                        className: "area-label-marker",
+                        iconSize: [80, 20],
+                        iconAnchor: [40, 10],
+                    }),
+                    interactive: false,
+                });
+                this.measurementLayerGroup.addLayer(areaMarker);
 
-                    // Tinh diem giua cua canh
-                    const midpoint = turf.midpoint(from, to);
-                    const midLat = midpoint.geometry.coordinates[1];
-                    const midLng = midpoint.geometry.coordinates[0];
+                // Label chieu dai canh (Fix 6: text-stroke)
+                if (coords.length > 3) {
+                    for (let i = 0; i < coords.length - 1; i++) {
+                        const from = turf.point([coords[i][0], coords[i][1]]);
+                        const to = turf.point([coords[i + 1][0], coords[i + 1][1]]);
+                        const distance = turf.distance(from, to, { units: "meters" });
 
-                    // Hien thi chieu dai canh (neu lon hon 10m)
-                    if (distance > 10) {
-                        const edgeLabel = document.createElement("div");
-                        edgeLabel.style.cssText = `
-                            background: rgba(255,255,255,0.9);
-                            padding: 2px 4px;
-                            border-radius: 2px;
-                            font-size: 10px;
-                            color: #666;
-                            white-space: nowrap;
-                        `;
+                        if (distance > 10) {
+                            const midpoint = turf.midpoint(from, to);
+                            const midLat = midpoint.geometry.coordinates[1];
+                            const midLng = midpoint.geometry.coordinates[0];
 
-                        // Display as km or m
-                        let distText;
-                        if (distance >= 1000) {
-                            distText = (distance / 1000).toFixed(2) + " km";
-                        } else {
-                            distText = distance.toFixed(0) + " m";
+                            const distText =
+                                distance >= 1000
+                                    ? (distance / 1000).toFixed(2) + " km"
+                                    : distance.toFixed(0) + " m";
+
+                            const edgeLabel = document.createElement("div");
+                            edgeLabel.style.cssText = `
+                                font-size: 10px;
+                                color: #333;
+                                white-space: nowrap;
+                                text-shadow: ${textStroke};
+                                pointer-events: none;
+                            `;
+                            edgeLabel.textContent = distText;
+
+                            const edgeMarker = L.marker([midLat, midLng], {
+                                icon: L.divIcon({
+                                    html: edgeLabel,
+                                    className: "edge-label-marker",
+                                    iconSize: [50, 14],
+                                    iconAnchor: [25, 7],
+                                }),
+                                interactive: false,
+                            });
+                            this.measurementLayerGroup.addLayer(edgeMarker);
                         }
-
-                        edgeLabel.innerHTML = distText;
-
-                        const edgeMarker = L.marker([midLat, midLng], {
-                            icon: L.divIcon({
-                                html: edgeLabel,
-                                className: "edge-label-marker",
-                                iconSize: [40, 16],
-                            }),
-                            interactive: false,
-                        });
-                        this.measurementLayerGroup.addLayer(edgeMarker);
                     }
                 }
-            }
+            });
         } catch (error) {
             console.warn("Loi khi them measurement labels:", error);
         }
     }
 
     /**
-     * Tao custom toolbar voi cac nut: Merge, Copy WMS, Save, Split
+     * Gan event pm:markerdragend len 1 layer de cap nhat measurement real-time (Fix 7)
      */
+    bindEditMeasurementUpdate(layer) {
+        const updateFn = () => this.updateAllMeasurements();
+
+        const bindOnSub = (l) => {
+            if (l.on) {
+                l.on("pm:markerdragend", updateFn);
+                l.on("pm:vertexadded", updateFn);
+                l.on("pm:vertexremoved", updateFn);
+                l.on("pm:edit", updateFn);
+            }
+        };
+
+        if (layer.eachLayer) {
+            layer.eachLayer(bindOnSub);
+        } else {
+            bindOnSub(layer);
+        }
+    }
+
+    /**
+     * Go event measurement khoi layer
+     */
+    unbindEditMeasurementUpdate(layer) {
+        const unbindOnSub = (l) => {
+            if (l.off) {
+                l.off("pm:markerdragend");
+                l.off("pm:vertexadded");
+                l.off("pm:vertexremoved");
+                l.off("pm:edit");
+            }
+        };
+
+        if (layer.eachLayer) {
+            layer.eachLayer(unbindOnSub);
+        } else {
+            unbindOnSub(layer);
+        }
+    }
+
+    // ========================================
+    // TOOLBAR
+    // ========================================
+
     setupToolButtons() {
         const toolbar = document.createElement("div");
         toolbar.id = "sketch-toolbar";
@@ -284,89 +415,64 @@ class SketchManager {
             display: none;
         `;
 
-        // ========== DRAW MODE TOOLS ==========
-        // Selection/Pointer button
+        // DRAW MODE TOOLS
         const pointerBtn = this.createToolButton(
-            "Con trỏ",
-            "bi-cursor",
-            "Chế độ chọn",
+            "Con trỏ", "bi-cursor", "Chế độ chọn đối tượng",
             () => this.setDrawMode(null),
         );
         pointerBtn.id = "sketch-pointer-btn";
 
-        // Draw Polygon button
         const drawBtn = this.createToolButton(
-            "Vẽ Polygon",
-            "bi-pentagon-fill",
-            "Bắt đầu vẽ polygon",
+            "Vẽ Polygon", "bi-pentagon-fill", "Bắt đầu vẽ polygon",
             () => this.setDrawMode("Polygon"),
         );
         drawBtn.id = "sketch-draw-btn";
 
-        // Edit button
         const editBtn = this.createToolButton(
-            "Chỉnh sửa",
-            "bi-pencil-fill",
-            "Chỉnh sửa polygon đã vẽ",
+            "Chỉnh sửa", "bi-pencil-fill", "Chỉnh sửa đối tượng đã chọn",
             () => this.setDrawMode("edit"),
         );
         editBtn.id = "sketch-edit-btn";
 
-        // Remove button
         const removeBtn = this.createToolButton(
-            "Xóa",
-            "bi-trash-fill",
-            "Xóa polygon",
-            () => this.setDrawMode("remove"),
+            "Xóa", "bi-trash-fill", "Xóa đối tượng đã chọn",
+            () => this.handleRemoveSelected(),
         );
         removeBtn.id = "sketch-remove-btn";
 
-        // Add draw mode tools to toolbar
         toolbar.appendChild(pointerBtn);
         toolbar.appendChild(drawBtn);
         toolbar.appendChild(editBtn);
         toolbar.appendChild(removeBtn);
 
-        // Separator line
+        // Separator
         const separator = document.createElement("div");
         separator.style.cssText = "height: 1px; background: #ddd; margin: 5px 0;";
         toolbar.appendChild(separator);
 
-        // ========== ACTION BUTTONS ==========
-        // Merge button
+        // ACTION BUTTONS
         const mergeBtn = this.createToolButton(
-            "Merge",
-            "bi-subtract",
-            "Chon it nhat 2 vung de gop",
+            "Merge", "bi-subtract", "Chọn ít nhất 2 đối tượng để gộp",
             () => this.handleMerge(),
         );
         mergeBtn.id = "sketch-merge-btn";
         mergeBtn.disabled = true;
 
-        // Copy WMS button
         const copyWmsBtn = this.createToolButton(
-            "Copy WMS",
-            "bi-folder-plus",
-            "Chon polygon WMS de copy",
+            "Copy WMS", "bi-folder-plus", "Chọn polygon WMS để copy",
             () => this.enableWMSSelection(),
         );
         copyWmsBtn.id = "sketch-copy-wms-btn";
 
-        // Save button
         const saveBtn = this.createToolButton(
-            "Save",
-            "bi-check2",
-            "Khong co polygon de luu",
+            "Save", "bi-check2", "Không có polygon để lưu",
             () => this.handleSave(),
         );
         saveBtn.id = "sketch-save-btn";
         saveBtn.disabled = true;
 
-        // Split button
         const splitBtn = this.createToolButton(
-            "Split",
-            "bi-scissors",
-            "Chon 1 vung de tach",
+            "Split", "bi-scissors", "Chọn 1 đối tượng để tách",
             () => this.handleSplit(),
         );
         splitBtn.id = "sketch-split-btn";
@@ -377,7 +483,6 @@ class SketchManager {
         toolbar.appendChild(saveBtn);
         toolbar.appendChild(splitBtn);
 
-        // Append toolbar to sketch panel (below toggle button)
         const sketchPanel = document.getElementById("sketchPanel");
         if (sketchPanel) {
             const cardBody = sketchPanel.querySelector(".card-body");
@@ -388,124 +493,115 @@ class SketchManager {
         this.toolbar = toolbar;
     }
 
-    /**
-     * Tao nut tool chung
-     */
     createToolButton(label, icon, title, onClick) {
         const btn = document.createElement("button");
         btn.className = "btn btn-outline-secondary btn-sm";
         btn.title = title;
-        btn.style.cssText = `
-            width: 100%;
-            text-align: left;
-            margin-bottom: 5px;
-        `;
+        btn.style.cssText = "width: 100%; text-align: left; margin-bottom: 5px;";
         btn.innerHTML = `<i class="bi ${icon}"></i> ${label}`;
         btn.addEventListener("click", onClick);
         return btn;
     }
 
-    /**
-     * Thay doi che do ve (pointer/draw/edit/remove)
-     */
+    // ========================================
+    // DRAW MODE (Fix 1, 2, 3)
+    // ========================================
+
     setDrawMode(mode) {
         if (!this.isVisible) return;
 
         try {
-            // Tat tat ca cac che do hien tai
+            // Tat tat ca draw modes
             if (this.map.pm) {
                 this.map.pm.disableDraw("Polygon");
                 this.map.pm.disableDraw("Line");
             }
 
-            // Disable edit mode on all layers
+            // Disable edit trên tất cả layers
             this.sketchLayerGroup.eachLayer((layer) => {
-                if (layer.pm) {
-                    layer.pm.disable();
-                }
+                this._disableEditOnLayer(layer);
+                this.unbindEditMeasurementUpdate(layer);
             });
 
-            // Remove remove mode handler if exists
-            this.removeRemoveModeHandler();
+            // Reset cursor
+            this.map.getContainer().style.cursor = "";
 
-            // Kich hoat che do yeu cau
             if (mode === "Polygon") {
+                // Ve polygon moi
                 if (this.map.pm) {
                     this.map.pm.enableDraw("Polygon");
                 }
+                this.clearSelection();
             } else if (mode === "edit") {
-                // Enable edit mode on all layers
-                this.sketchLayerGroup.eachLayer((layer) => {
-                    if (layer.pm) {
-                        layer.pm.enable();
-                    }
-                });
-            } else if (mode === "remove") {
-                // Kich hoat remove mode bang click handler
-                this.enableRemoveMode();
+                // Fix 2: Chi edit cac layer da chon
+                if (this.selectedLayers.size === 0) {
+                    // Neu chua chon -> enable edit cho tat ca (fallback)
+                    this.sketchLayerGroup.eachLayer((layer) => {
+                        this._enableEditOnLayer(layer);
+                        this.bindEditMeasurementUpdate(layer);
+                    });
+                } else {
+                    this.selectedLayers.forEach((layer) => {
+                        this._enableEditOnLayer(layer);
+                        this.bindEditMeasurementUpdate(layer);
+                    });
+                }
             }
-            // mode === null = pointer/selection mode - tat het
+            // mode === null -> pointer/selection mode, khong lam gi them
 
-            // Luu che do hien tai
             this.currentDrawMode = mode;
-
-            // Cap nhat trang thai cac nut
             this.updateDrawModeButtonStates(mode);
         } catch (error) {
             console.error("Loi khi thay doi draw mode:", error);
         }
     }
 
-    /**
-     * Kich hoat remove mode
-     */
-    enableRemoveMode() {
-        // Setup click handler de xoa layer
-        this.removeClickHandler = (e) => {
-            const clickedLayer = e.layer;
-            if (
-                clickedLayer &&
-                this.sketchLayerGroup.hasLayer(clickedLayer)
-            ) {
-                this.sketchLayerGroup.removeLayer(clickedLayer);
-                this.measurementLayerGroup.clearLayers();
-                this.trackChanges();
-            }
-        };
-        this.map.on("click", this.removeClickHandler);
-
-        // Doi cursor thanh crosshair de bao hieu dang o remove mode
-        this.map.getContainer().style.cursor = "not-allowed";
-    }
-
-    /**
-     * Tat remove mode handler
-     */
-    removeRemoveModeHandler() {
-        if (this.removeClickHandler) {
-            this.map.off("click", this.removeClickHandler);
-            this.removeClickHandler = null;
+    _enableEditOnLayer(layer) {
+        if (layer.pm) {
+            layer.pm.enable();
+        } else if (layer.eachLayer) {
+            layer.eachLayer((sub) => {
+                if (sub.pm) sub.pm.enable();
+            });
         }
-        this.map.getContainer().style.cursor = "grab";
+    }
+
+    _disableEditOnLayer(layer) {
+        if (layer.pm) {
+            layer.pm.disable();
+        } else if (layer.eachLayer) {
+            layer.eachLayer((sub) => {
+                if (sub.pm) sub.pm.disable();
+            });
+        }
     }
 
     /**
-     * Cap nhat trang thai visual cua draw mode buttons
+     * Fix 3: Xoa cac doi tuong da chon
      */
-    updateDrawModeButtonStates(activeMode) {
-        const pointerBtn = document.getElementById("sketch-pointer-btn");
-        const drawBtn = document.getElementById("sketch-draw-btn");
-        const editBtn = document.getElementById("sketch-edit-btn");
-        const removeBtn = document.getElementById("sketch-remove-btn");
+    handleRemoveSelected() {
+        if (this.selectedLayers.size === 0) {
+            alert("Chọn ít nhất 1 đối tượng để xóa");
+            return;
+        }
 
+        this.selectedLayers.forEach((layer) => {
+            this.sketchLayerGroup.removeLayer(layer);
+        });
+        this.selectedLayers.clear();
+        this.updateAllMeasurements();
+        this.trackChanges();
+    }
+
+    updateDrawModeButtonStates(activeMode) {
         const buttons = [
-            { btn: pointerBtn, mode: null },
-            { btn: drawBtn, mode: "Polygon" },
-            { btn: editBtn, mode: "edit" },
-            { btn: removeBtn, mode: "remove" },
+            { id: "sketch-pointer-btn", mode: null },
+            { id: "sketch-draw-btn", mode: "Polygon" },
+            { id: "sketch-edit-btn", mode: "edit" },
         ];
 
-        buttons.forEach(({ btn, mode }) => {
+        buttons.forEach(({ id, mode }) => {
+            const btn = document.getElementById(id);
             if (btn) {
                 if (mode === activeMode) {
                     btn.classList.remove("btn-outline-secondary");
@@ -518,141 +614,142 @@ class SketchManager {
         });
     }
 
-    /**
-     * Theo doi thay doi
-     */
+    // ========================================
+    // TRACK & BUTTON STATES
+    // ========================================
+
     trackChanges() {
         this.isDirty = true;
         this.updateToolButtonsState();
     }
 
-    /**
-     * Cap nhat trang thai cac nut
-     */
     updateToolButtonsState() {
-        const selectedLayers = this.sketchLayerGroup.getLayers();
-        const hasMultipleSelection = selectedLayers.length >= 2;
-        const hasSingleSelection = selectedLayers.length === 1;
+        const selectedCount = this.selectedLayers.size;
         const saveable = this.getSaveablePolygons().length > 0;
 
         const mergeBtn = document.getElementById("sketch-merge-btn");
         const saveBtn = document.getElementById("sketch-save-btn");
         const splitBtn = document.getElementById("sketch-split-btn");
+        const removeBtn = document.getElementById("sketch-remove-btn");
 
-        if (mergeBtn) mergeBtn.disabled = !hasMultipleSelection;
+        // Fix 4: Merge can chon >= 2
+        if (mergeBtn) {
+            mergeBtn.disabled = selectedCount < 2;
+            mergeBtn.title = selectedCount < 2
+                ? `Chọn ít nhất 2 đối tượng (đang chọn ${selectedCount})`
+                : `Gộp ${selectedCount} đối tượng`;
+        }
+
         if (saveBtn) {
             saveBtn.disabled = !saveable;
-            saveBtn.title = saveable
-                ? "Luu polygon"
-                : "Khong co polygon de luu";
+            saveBtn.title = saveable ? "Lưu polygon" : "Không có polygon để lưu";
         }
+
+        // Fix 5: Split can chon dung 1
         if (splitBtn) {
-            splitBtn.disabled = !hasSingleSelection;
-            splitBtn.title = hasSingleSelection
-                ? "Tach polygon"
-                : "Chon 1 vung de tach";
+            splitBtn.disabled = selectedCount !== 1;
+            splitBtn.title = selectedCount !== 1
+                ? `Chọn đúng 1 đối tượng để tách (đang chọn ${selectedCount})`
+                : "Tách đối tượng đã chọn";
+        }
+
+        // Remove can chon >= 1
+        if (removeBtn) {
+            removeBtn.title = selectedCount > 0
+                ? `Xóa ${selectedCount} đối tượng đã chọn`
+                : "Chọn đối tượng để xóa";
         }
     }
 
-    /**
-     * Gop 2+ polygon thanh 1
-     */
+    // ========================================
+    // MERGE (Fix 4)
+    // ========================================
+
     async handleMerge() {
-        const selectedLayers = this.sketchLayerGroup.getLayers();
-        if (selectedLayers.length < 2) {
-            alert("Chon it nhat 2 polygon de gop");
+        if (this.selectedLayers.size < 2) {
+            alert("Chọn ít nhất 2 đối tượng để gộp");
             return;
         }
 
         try {
-            const selectedGeoJSONs = selectedLayers.map((layer) =>
-                layer.toGeoJSON(),
-            );
+            const selectedArr = Array.from(this.selectedLayers);
+            const geojsons = selectedArr.map((l) => l.toGeoJSON());
 
-            // Dung Turf.js de gop
-            let merged = selectedGeoJSONs[0];
-            for (let i = 1; i < selectedGeoJSONs.length; i++) {
-                const fc = turf.featureCollection([
-                    merged,
-                    selectedGeoJSONs[i],
-                ]);
-                merged = turf.union(fc);
-            }
-
-            // Xoa cac polygon goc
-            selectedLayers.forEach((layer) => {
-                this.sketchLayerGroup.removeLayer(layer);
+            // Normalize to features array
+            const features = [];
+            geojsons.forEach((gj) => {
+                if (gj.type === "FeatureCollection") {
+                    features.push(...gj.features);
+                } else {
+                    features.push(gj);
+                }
             });
 
-            // Tao polygon moi tu merged GeoJSON
+            let merged = features[0];
+            for (let i = 1; i < features.length; i++) {
+                merged = turf.union(turf.featureCollection([merged, features[i]]));
+            }
+
+            // Xoa goc
+            selectedArr.forEach((layer) => {
+                this.sketchLayerGroup.removeLayer(layer);
+            });
+            this.selectedLayers.clear();
+
+            // Tao layer moi
             const mergedLayer = L.geoJSON(merged.geometry, {
                 style: this.mergeStyle,
             });
-
-            mergedLayer.setStyle(this.mergeStyle);
-            mergedLayer.pm.enable();
-
-            // Gan attributes
             mergedLayer._polygonId = this.generateUniquePolygonId();
             mergedLayer._isSaved = false;
             mergedLayer._createdAt = new Date().toISOString();
             mergedLayer._type = "merged";
 
             this.sketchLayerGroup.addLayer(mergedLayer);
+            this.bindSelectionHandler(mergedLayer);
+            this.updateAllMeasurements();
             this.trackChanges();
         } catch (error) {
             console.error("Loi khi gop polygon:", error);
-            alert("Khong the gop polygon: " + error.message);
+            alert("Không thể gộp polygon: " + error.message);
         }
     }
 
-    /**
-     * Bat dau che do tach polygon
-     */
+    // ========================================
+    // SPLIT (Fix 5)
+    // ========================================
+
     handleSplit() {
-        const selectedLayers = this.sketchLayerGroup.getLayers();
-        if (selectedLayers.length !== 1) {
-            alert("Chon dung 1 polygon de tach");
+        if (this.selectedLayers.size !== 1) {
+            alert("Chọn đúng 1 đối tượng để tách");
             return;
         }
 
-        this.enterSplitMode(selectedLayers[0]);
+        const selectedLayer = Array.from(this.selectedLayers)[0];
+        this.clearSelection();
+        this.enterSplitMode(selectedLayer);
     }
 
-    /**
-     * Vao che do cat polygon
-     */
     enterSplitMode(selectedLayer) {
         this.selectedPolygonForSplit = selectedLayer;
         this.isSplitMode = true;
 
-        // An toolbar
         if (this.toolbar) this.toolbar.style.display = "none";
-
-        // Hien instruction
         this.showSplitInstruction();
 
-        // Bat che do ve duong
         if (this.map.pm) {
             this.map.pm.enableDraw("Line");
 
-            // Lang nghe event pm:create cho line
             this.map.once("pm:create", (e) => {
-                if (
-                    this.isSplitMode &&
-                    this.selectedPolygonForSplit &&
-                    e.layer
-                ) {
+                if (this.isSplitMode && this.selectedPolygonForSplit && e.layer) {
                     this.performSplit(e.layer.toGeoJSON());
                     this.map.removeLayer(e.layer);
                 }
             });
         }
 
-        // Doi cursor thanh crosshair
         this.map.getContainer().style.cursor = "crosshair";
 
-        // Them ESC key handler
         const escapeHandler = (event) => {
             if (event.key === "Escape") {
                 this.exitSplitMode();
@@ -662,110 +759,67 @@ class SketchManager {
         document.addEventListener("keydown", escapeHandler);
     }
 
-    /**
-     * Hien instruction overlay
-     */
     showSplitInstruction() {
         let instruction = document.getElementById("split-instruction");
         if (!instruction) {
             instruction = document.createElement("div");
             instruction.id = "split-instruction";
             instruction.style.cssText = `
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(0,0,0,0.8);
-                color: white;
-                padding: 20px 40px;
-                border-radius: 8px;
-                font-size: 16px;
-                z-index: 9999;
-                text-align: center;
+                position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.8); color: white; padding: 20px 40px;
+                border-radius: 8px; font-size: 16px; z-index: 9999; text-align: center;
             `;
             instruction.innerHTML = `
-                <div>Ve duong cat qua polygon</div>
-                <div style="font-size: 12px; margin-top: 10px;">Nhan ESC de huy</div>
+                <div>Vẽ đường cắt qua polygon</div>
+                <div style="font-size: 12px; margin-top: 10px;">Nhấn ESC để hủy</div>
             `;
             this.map.getContainer().appendChild(instruction);
         }
     }
 
-    /**
-     * An instruction overlay
-     */
     hideSplitInstruction() {
         const instruction = document.getElementById("split-instruction");
-        if (instruction) {
-            instruction.remove();
-        }
+        if (instruction) instruction.remove();
     }
 
-    /**
-     * Thuc hien cat polygon bang duong ve
-     */
     async performSplit(splitLineGeoJSON) {
         if (!this.selectedPolygonForSplit) return;
 
         try {
-            const polygonFeature = this.selectedPolygonForSplit.toGeoJSON();
-            const lineFeature = splitLineGeoJSON;
+            let polygonFeature;
+            const gj = this.selectedPolygonForSplit.toGeoJSON();
+            if (gj.type === "FeatureCollection" && gj.features.length > 0) {
+                polygonFeature = gj.features[0];
+            } else {
+                polygonFeature = gj;
+            }
 
-            // Tao buffer nho tu line (0.0001km ~ 10m)
-            const thinBuffer = turf.buffer(lineFeature, 0.0001, {
-                units: "kilometers",
-            });
-
-            // Su dung difference de cat polygon
-            const diff = turf.difference(
-                turf.featureCollection([polygonFeature, thinBuffer]),
-            );
+            const thinBuffer = turf.buffer(splitLineGeoJSON, 0.0001, { units: "kilometers" });
+            const diff = turf.difference(turf.featureCollection([polygonFeature, thinBuffer]));
 
             let splitResults = [];
 
-            // Neu ket qua la MultiPolygon
-            if (
-                diff &&
-                diff.geometry &&
-                diff.geometry.type === "MultiPolygon"
-            ) {
-                diff.geometry.coordinates.forEach((coords, index) => {
+            if (diff && diff.geometry && diff.geometry.type === "MultiPolygon") {
+                diff.geometry.coordinates.forEach((coords) => {
                     splitResults.push({
                         type: "Feature",
-                        geometry: {
-                            type: "Polygon",
-                            coordinates: coords,
-                        },
+                        geometry: { type: "Polygon", coordinates: coords },
                         properties: {},
                     });
                 });
-            } else if (
-                diff &&
-                diff.geometry &&
-                diff.geometry.type === "Polygon"
-            ) {
-                // Neu chi co 1 polygon -> cat khong thành công
-                console.warn("Duong cat khong chia polygon thanh 2 phan");
-                alert("Duong cat phai di qua polygon de tach thanh 2 phan");
+            } else if (diff && diff.geometry && diff.geometry.type === "Polygon") {
+                alert("Đường cắt phải đi qua polygon để tách thành 2 phần");
                 this.exitSplitMode();
                 return;
             }
 
             if (splitResults.length > 1) {
-                // Xoa polygon goc
                 this.sketchLayerGroup.removeLayer(this.selectedPolygonForSplit);
 
-                // Tao Leaflet layer cho moi phan
                 splitResults.forEach((part, index) => {
-                    const style =
-                        this.splitResultStyles[
-                            index % this.splitResultStyles.length
-                        ];
+                    const style = this.splitResultStyles[index % this.splitResultStyles.length];
                     const partLayer = L.geoJSON(part.geometry, { style });
-                    partLayer.setStyle(style);
-                    partLayer.pm.enable();
 
-                    // Gan attributes
                     partLayer._polygonId = this.generateUniquePolygonId();
                     partLayer._isSaved = false;
                     partLayer._createdAt = new Date().toISOString();
@@ -773,97 +827,69 @@ class SketchManager {
                     partLayer._splitIndex = index;
 
                     this.sketchLayerGroup.addLayer(partLayer);
+                    this.bindSelectionHandler(partLayer);
                 });
 
                 this.shouldCheckPolygonCount = false;
+                this.updateAllMeasurements();
                 this.trackChanges();
             } else {
-                alert("Khong the tach polygon: duong cat khong hop le");
+                alert("Không thể tách polygon: đường cắt không hợp lệ");
             }
         } catch (error) {
             console.error("Loi khi tach polygon:", error);
-            alert("Loi khi tach polygon: " + error.message);
+            alert("Lỗi khi tách polygon: " + error.message);
         } finally {
             this.exitSplitMode();
         }
     }
 
-    /**
-     * Thoat che do cat
-     */
     exitSplitMode() {
         this.isSplitMode = false;
         this.selectedPolygonForSplit = null;
 
-        // Hien toolbar
         if (this.toolbar) this.toolbar.style.display = "block";
-
-        // An instruction
         this.hideSplitInstruction();
+        this.map.getContainer().style.cursor = "";
 
-        // Doi cursor ve default
-        this.map.getContainer().style.cursor = "grab";
-
-        // Tat Line draw neu co
         if (this.map.pm) {
-            try {
-                this.map.pm.disableDraw("Line");
-            } catch (e) {
-                // Ignore error
-            }
+            try { this.map.pm.disableDraw("Line"); } catch (e) { /* ignore */ }
         }
     }
 
-    /**
-     * Lay danh sach polygon co the luu
-     */
+    // ========================================
+    // SAVE
+    // ========================================
+
     getSaveablePolygons() {
         return this.sketchLayerGroup
             .getLayers()
             .filter((layer) => this.canPolygonBeSaved(layer));
     }
 
-    /**
-     * Kiem tra polygon co the save khong
-     */
     canPolygonBeSaved(layer) {
-        return (
-            layer && (!layer._isSaved || (layer._isSaved && layer._isModified))
-        );
+        return layer && (!layer._isSaved || (layer._isSaved && layer._isModified));
     }
 
-    /**
-     * Mark polygon as saved
-     */
     markPolygonAsSaved(layer) {
         layer._isSaved = true;
         layer._isModified = false;
-        layer.setStyle(this.savedStyle);
+        if (layer.setStyle) layer.setStyle(this.savedStyle);
         this.savedPolygonIds.add(layer._polygonId);
     }
 
-    /**
-     * Xu ly luu polygon (POST API)
-     */
     async handleSave() {
         const saveable = this.getSaveablePolygons();
         if (saveable.length === 0) {
-            alert("Khong co polygon de luu");
-            return;
-        }
-
-        // Kiem tra so luong
-        if (this.shouldCheckPolygonCount && saveable.length < 1) {
-            alert("Can luu it nhat 1 polygon");
+            alert("Không có polygon để lưu");
             return;
         }
 
         try {
             const polygonData = saveable.map((layer) => this.layerToWKT(layer));
 
-            // Kiem tra filterScope
             if (!window.filterScope) {
-                alert("filterScope khong duoc dinh nghia");
+                alert("filterScope không được định nghĩa");
                 return;
             }
 
@@ -881,43 +907,35 @@ class SketchManager {
                 body: JSON.stringify(payload),
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-            const result = await response.json();
-
-            // Mark saved
             saveable.forEach((layer) => this.markPolygonAsSaved(layer));
             this.isDirty = false;
 
-            alert("Luu thanh cong!");
+            alert("Lưu thành công!");
 
-            // Xu ly redirect neu co
             if (this.options.redirectAfterSave && this.options.redirectUrl) {
-                setTimeout(() => {
-                    window.location.href = this.options.redirectUrl;
-                }, 1000);
+                setTimeout(() => { window.location.href = this.options.redirectUrl; }, 1000);
             }
         } catch (error) {
             console.error("Loi khi luu polygon:", error);
-            alert("Loi khi luu: " + error.message);
+            alert("Lỗi khi lưu: " + error.message);
         }
     }
 
-    /**
-     * Chuyen Leaflet layer sang WKT format
-     */
     layerToWKT(layer) {
         const geojson = layer.toGeoJSON();
-        const wktString = this.createWKTFromGeometry(geojson.geometry);
+        let feature;
+        if (geojson.type === "FeatureCollection" && geojson.features.length > 0) {
+            feature = geojson.features[0];
+        } else {
+            feature = geojson;
+        }
 
-        // Tinh dien tich (m2 -> ha)
-        const areaM2 = turf.area(geojson);
+        const wktString = this.createWKTFromGeometry(feature.geometry);
+        const areaM2 = turf.area(feature);
         const areaHa = areaM2 / 10000;
-
-        // Tinh centroid
-        const centroidPoint = turf.centroid(geojson);
+        const centroidPoint = turf.centroid(feature);
 
         return {
             id: layer._polygonId,
@@ -934,21 +952,15 @@ class SketchManager {
         };
     }
 
-    /**
-     * Tao WKT string tu GeoJSON geometry
-     */
     createWKTFromGeometry(geometry) {
         if (geometry.type === "Polygon") {
-            const coords = geometry.coordinates[0]; // Outer ring
-            const wktCoords = coords
-                .map((coord) => `${coord[0]} ${coord[1]}`)
+            const wktCoords = geometry.coordinates[0]
+                .map((c) => `${c[0]} ${c[1]}`)
                 .join(", ");
             return `POLYGON((${wktCoords}))`;
         } else if (geometry.type === "MultiPolygon") {
             const polygons = geometry.coordinates.map((coords) => {
-                const wktCoords = coords[0]
-                    .map((coord) => `${coord[0]} ${coord[1]}`)
-                    .join(", ");
+                const wktCoords = coords[0].map((c) => `${c[0]} ${c[1]}`).join(", ");
                 return `(${wktCoords})`;
             });
             return `MULTIPOLYGON(${polygons.join(", ")})`;
@@ -956,121 +968,111 @@ class SketchManager {
         return null;
     }
 
-    /**
-     * Enable WMS selection mode
-     */
+    // ========================================
+    // WMS SELECTION
+    // ========================================
+
     enableWMSSelection() {
         this.isWMSSelectionMode = true;
 
-        // Disable cac WMS layer
-        if (typeof wmsManager !== "undefined") {
-            this.disabledWMSLayers = [];
-            wmsManager.wmsLayers.forEach((layer, configId) => {
-                if (this.map.hasLayer(layer)) {
-                    this.disabledWMSLayers.push(configId);
-                    this.map.removeLayer(layer);
-                }
-            });
-        }
+        this._wmsSelectionClickHandler = (event) => {
+            L.DomEvent.stopPropagation(event);
+            this.queryAndCopyWMS(event);
+        };
+        this.map.on("click", this._wmsSelectionClickHandler);
 
-        // Them click handler
-        this.wmsClickHandler = (event) => this.queryAndHighlightWMS(event);
-        this.map.on("click", this.wmsClickHandler);
-
-        alert("Click polygon tren ban do de chon");
+        this.map.getContainer().style.cursor = "copy";
+        alert("Click vào polygon WMS trên bản đồ để copy");
     }
 
-    /**
-     * Disable WMS selection mode
-     */
     disableWMSSelection() {
         this.isWMSSelectionMode = false;
 
-        // Remove click handler
-        if (this.wmsClickHandler) {
-            this.map.off("click", this.wmsClickHandler);
+        if (this._wmsSelectionClickHandler) {
+            this.map.off("click", this._wmsSelectionClickHandler);
+            this._wmsSelectionClickHandler = null;
         }
 
-        // Re-enable cac WMS layer
-        if (typeof wmsManager !== "undefined") {
-            this.disabledWMSLayers.forEach((configId) => {
-                const layer = wmsManager.wmsLayers.get(configId);
-                if (layer) {
-                    this.map.addLayer(layer);
-                }
-            });
-        }
-
-        this.disabledWMSLayers = [];
+        this.map.getContainer().style.cursor = "";
     }
 
-    /**
-     * Query WMS va highlight ket qua
-     */
-    async queryAndHighlightWMS(event) {
+    async queryAndCopyWMS(event) {
         if (!this.isWMSSelectionMode) return;
+        if (typeof wmsManager === "undefined") return;
 
         try {
-            if (typeof wmsManager !== "undefined") {
-                wmsManager.handleMapClick(event);
+            // Lay lop WMS tren cung theo zIndex
+            const sortedConfigs = wmsManager.getVisibleConfigsSortedByZIndex();
+            if (sortedConfigs.length === 0) {
+                alert("Không có lớp WMS nào đang hiển thị");
                 this.disableWMSSelection();
+                return;
+            }
+
+            // Query tung lop tu tren xuong, lay lop dau tien co geometry
+            let foundFeature = null;
+            for (const config of sortedConfigs) {
+                const layer = wmsManager.wmsLayers.get(config.id);
+                if (!layer) continue;
+
+                const result = await wmsManager.quickCheckFeatureInfo(event, layer, config);
+                if (result && result.data && result.data.length > 0) {
+                    const feature = result.data[0];
+                    if (feature.geometry && (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon")) {
+                        foundFeature = feature;
+                        break;
+                    }
+                }
+            }
+
+            if (foundFeature) {
+                this.convertWMSToSketch(foundFeature);
+            } else {
+                alert("Không tìm thấy polygon tại vị trí click");
             }
         } catch (error) {
             console.error("Loi khi query WMS:", error);
+            alert("Lỗi khi query WMS: " + error.message);
+        } finally {
+            this.disableWMSSelection();
         }
     }
 
-    /**
-     * Copy polygon tu WMS sang sketch layer
-     */
     convertWMSToSketch(wmsFeature) {
         try {
-            const geometry = wmsFeature.geometry;
+            const newLayer = L.geoJSON(wmsFeature.geometry, { style: this.fillStyle });
 
-            // Tao L.geoJSON layer
-            const newLayer = L.geoJSON(geometry, {
-                style: this.fillStyle,
-            });
-
-            newLayer.setStyle(this.fillStyle);
-            newLayer.pm.enable();
-
-            // Gan attributes
             newLayer._polygonId = this.generateUniquePolygonId();
             newLayer._isSaved = false;
             newLayer._createdAt = new Date().toISOString();
             newLayer._properties = wmsFeature.properties || {};
 
-            // Clear old sketches
-            this.sketchLayerGroup.clearLayers();
-
-            // Add new layer
             this.sketchLayerGroup.addLayer(newLayer);
-
+            this.bindSelectionHandler(newLayer);
+            this.updateAllMeasurements();
             this.trackChanges();
-            alert("Da sao chep polygon tu WMS");
+            alert("Đã sao chép polygon từ WMS");
         } catch (error) {
             console.error("Loi khi sao chep polygon:", error);
-            alert("Loi khi sao chep: " + error.message);
+            alert("Lỗi khi sao chép: " + error.message);
         }
     }
 
-    /**
-     * Generate unique polygon ID
-     */
+    // ========================================
+    // UTILITIES
+    // ========================================
+
     generateUniquePolygonId() {
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substr(2, 9);
         this.polygonCounter++;
-        return `polygon_${timestamp}_${random}_${this.polygonCounter}`;
+        return `polygon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${this.polygonCounter}`;
     }
 
     /**
-     * Bat/tat visibility cua sketch tool
+     * Bat/tat sketch tool (Fix 1: auto bat pointer mode khi toggle on)
      */
     toggle() {
         if (this.isVisible) {
-            // An
+            // === TAT ===
             this.map.removeLayer(this.sketchLayerGroup);
             this.map.removeLayer(this.measurementLayerGroup);
 
@@ -1080,54 +1082,33 @@ class SketchManager {
                 try {
                     this.map.pm.disableDraw("Polygon");
                     this.map.pm.disableDraw("Line");
-                } catch (e) {
-                    // Ignore
-                }
+                } catch (e) { /* ignore */ }
             }
 
-            // Disable edit mode on all layers
             this.sketchLayerGroup.eachLayer((layer) => {
-                if (layer.pm) {
-                    layer.pm.disable();
-                }
+                this._disableEditOnLayer(layer);
+                this.unbindEditMeasurementUpdate(layer);
             });
 
-            // Clean up remove mode handler
-            this.removeRemoveModeHandler();
-
-            // Reset draw mode
+            this.clearSelection();
             this.currentDrawMode = null;
             this.updateDrawModeButtonStates(null);
+            this.map.getContainer().style.cursor = "";
 
-            // Re-enable WFS click handler
             this.restoreWFSClickHandler();
-
             this.isVisible = false;
         } else {
-            // Hien
+            // === BAT ===
             this.map.addLayer(this.sketchLayerGroup);
             this.map.addLayer(this.measurementLayerGroup);
 
             if (this.toolbar) this.toolbar.style.display = "block";
 
-            if (this.map.pm) {
-                try {
-                    // Cho phep edit mode cho cac layer ton tai
-                    this.sketchLayerGroup.eachLayer(layer => {
-                        if (layer.pm) {
-                            layer.pm.enable();
-                        }
-                    });
-                } catch (e) {
-                    // Ignore
-                }
-            }
-
-            // Disable WFS click handler
             this.disableWFSClickHandler();
 
-            // Set default mode to pointer (selection mode)
-            this.setDrawMode(null);
+            // Fix 1: Auto bat pointer mode (con tro) khi toggle on
+            this.currentDrawMode = null;
+            this.updateDrawModeButtonStates(null);
 
             this.isVisible = true;
         }
@@ -1135,45 +1116,31 @@ class SketchManager {
         return this.isVisible;
     }
 
-    /**
-     * Disable WFS click event listener
-     */
     disableWFSClickHandler() {
-        if (this.wfsClickHandler) {
-            this.map.off("click", this.wfsClickHandler);
+        if (this._wfsHandler) {
+            this.map.off("click", this._wfsHandler);
         }
     }
 
-    /**
-     * Restore WFS click event listener
-     */
     restoreWFSClickHandler() {
-        // Check if wmsManager exists and if default handler should be used
-        if (typeof wmsManager !== "undefined" && this.wfsClickHandler) {
-            this.map.on("click", this.wfsClickHandler);
+        if (typeof wmsManager !== "undefined" && this._wfsHandler) {
+            this.map.on("click", this._wfsHandler);
         }
     }
 
-    /**
-     * Set WFS click handler (called from index.js)
-     */
     setWFSClickHandler(handler) {
-        this.wfsClickHandler = handler;
+        this._wfsHandler = handler;
     }
 
-    /**
-     * Cleanup
-     */
     destroy() {
-        // Clean up remove mode handler
-        this.removeRemoveModeHandler();
+        this.sketchLayerGroup.eachLayer((layer) => {
+            this.unbindEditMeasurementUpdate(layer);
+        });
 
-        // Clean up WFS click handler
         this.disableWFSClickHandler();
 
-        if (this.toolbar) {
-            this.toolbar.remove();
-        }
+        if (this.toolbar) this.toolbar.remove();
         this.map.removeLayer(this.sketchLayerGroup);
+        this.map.removeLayer(this.measurementLayerGroup);
     }
 }
