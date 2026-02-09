@@ -13,6 +13,7 @@ class WMSLayerManager {
         this.map = map;
         this.wmsLayers = new Map(); // Map<configId, L.TileLayer.WMS>
         this.wmsConfigs = [...wmsLayers];
+        this.currentFilters = new Map(); // Map<configId, cqlFilterString>
         this.wfsUtil = new WFSUtil({
             defaultMaxFeatures: 1000,
             timeout: 10000,
@@ -70,6 +71,10 @@ class WMSLayerManager {
         if (!config) return;
 
         this.removeWMSLayer(config.id);
+
+        // Store the current filter for this layer
+        this.currentFilters.set(config.id, cqlFilter);
+
         await this.createAndAddWMSLayer(config, { cqlFilter });
         this.reorderWMSLayers();
 
@@ -178,7 +183,17 @@ class WMSLayerManager {
         if (isVisible) {
             this.removeWMSLayer(wmsId);
         } else {
-            this.createAndAddWMSLayer(config);
+            // Get the stored filter for this layer (if any)
+            const storedFilter = this.currentFilters.get(wmsId);
+
+            // Apply the stored filter when recreating the layer
+            if (storedFilter !== undefined) {
+                await this.createAndAddWMSLayer(config, {
+                    cqlFilter: storedFilter,
+                });
+            } else {
+                await this.createAndAddWMSLayer(config);
+            }
             this.reorderWMSLayers();
         }
 
@@ -186,7 +201,7 @@ class WMSLayerManager {
             const icon = button.querySelector("i");
             const nowVisible = this.wmsLayers.has(wmsId);
             if (icon) {
-                icon.className = nowVisible ? "bi bi-eye-fill" : "bi bi-eye";
+                icon.className = nowVisible ? "bi bi-eye-slash" : "bi bi-eye";
             }
         }
     }
@@ -248,7 +263,7 @@ class WMSLayerManager {
             btn.title = config.defaultVisible ? "An lop" : "Hien lop";
 
             const isVisible = this.wmsLayers.has(config.id);
-            btn.innerHTML = `<i class="bi ${isVisible ? "bi-eye-fill" : "bi-eye"}"></i>`;
+            btn.innerHTML = `<i class="bi ${isVisible ? "bi-eye-slash" : "bi-eye"}"></i>`;
 
             btn.addEventListener("click", () => {
                 this.toggleWMSLayer(config.id, btn);
@@ -742,9 +757,16 @@ class WMSLayerManager {
         if (btn) {
             const icon = btn.querySelector("i");
             if (icon) {
-                icon.className = isVisible ? "bi bi-eye-fill" : "bi bi-eye";
+                icon.className = isVisible ? "bi bi-eye-slash" : "bi bi-eye";
             }
             btn.title = isVisible ? "An lop" : "Hien lop";
         }
+    }
+
+    /**
+     * Xoa tat ca cac filter da luu
+     */
+    clearAllFilters() {
+        this.currentFilters.clear();
     }
 }

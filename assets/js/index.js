@@ -171,7 +171,7 @@ document
             await wmsManager.zoomToFilteredExtent(
                 WMS_URL_RANHGIOI,
                 "ws_ranhgioi:rg_vn_tinh_2025",
-                cqlTcqlinh,
+                cql,
             );
         }
     });
@@ -186,6 +186,9 @@ function resetFilter() {
     filterScope.commune_c = null;
 
     clearHighlights();
+
+    // Clear stored filters
+    wmsManager.clearAllFilters();
 
     // Reset WMS layers
     wmsManager.updateWMSLayer("ws_ranhgioi:rg_vn_tinh_2025", null, false);

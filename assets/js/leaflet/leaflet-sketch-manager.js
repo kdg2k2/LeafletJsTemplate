@@ -215,11 +215,6 @@ class SketchManager {
             // Khi dang o che do split, bo qua -> de handler cua enterSplitMode xu ly
             if (this.isSplitMode) return;
 
-            if (window.filterScope) {
-                filterScope.tt = null;
-                delete filterScope.id;
-            }
-
             // Kiem tra maxElements: neu vuot qua gioi han -> xoa het truoc khi them moi
             if (this.options.maxElements > 0) {
                 const currentCount = this.sketchLayerGroup.getLayers().length;
