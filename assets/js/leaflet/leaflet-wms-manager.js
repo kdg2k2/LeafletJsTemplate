@@ -490,11 +490,8 @@ class WMSLayerManager {
         const layerName = result.layerInfo?.name || result.layerName;
 
         const skipKeys = ["bbox", "geometry", "the_geom", "geom", "shape"];
-        const entries = Object.entries(props).filter(
-            ([key, value]) =>
-                !skipKeys.includes(key.toLowerCase()) &&
-                value !== null &&
-                value !== undefined,
+        const entries = Object.entries(props).filter(([key, value]) =>
+            !skipKeys.includes(key.toLowerCase()),
         );
 
         let html =
@@ -502,7 +499,7 @@ class WMSLayerManager {
 
         // Header
         html +=
-            '<div style="background:linear-gradient(135deg,#1565c0,#42a5f5);color:#fff;padding:8px 12px;">';
+            '<div style="padding:8px 12px;">';
         html += `<div style="font-size:13px;font-weight:600;"><i class="bi bi-layers-fill" style="margin-right:5px;opacity:0.8;"></i>${layerName}</div>`;
         if (entries.length > 0) {
             html += `<div style="font-size:10px;opacity:0.7;margin-top:2px;">${entries.length} thuoc tinh</div>`;
