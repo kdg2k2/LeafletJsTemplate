@@ -132,10 +132,7 @@ document
             );
 
             // Xoa ranh xa
-            const xaConfig = wmsManager.getWmsConfigWithNameLayer(
-                "ws_ranhgioi:rg_vn_xa_2025",
-            );
-            if (xaConfig) wmsManager.removeWMSLayer(xaConfig.id);
+            wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_xa_2025");
         }
     });
 
@@ -152,36 +149,29 @@ document
         clearHighlights();
 
         if (communeCode) {
+            // Xoa lop ranh gioi tinh
+            wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_tinh_2025");
+
             // Cap nhat WMS ranh gioi xa voi CQL filter theo xa
-            const cqlXa = `maxa='${communeCode}'`;
             await wmsManager.updateWMSLayer(
                 "ws_ranhgioi:rg_vn_xa_2025",
-                cqlXa,
+                `maxa='${communeCode}'`,
                 true,
-            );
-
-            // Highlight ranh xa
-            await wmsManager.highlightSelectedFeature(
-                wmsManager.getWmsConfigWithNameLayer(
-                    "ws_ranhgioi:rg_vn_xa_2025",
-                ),
-                cqlXa,
             );
         } else if (filterScope.province_c) {
             // Quay lai hien tat ca xa cua tinh
-            const cqlXa = `matinh='${filterScope.province_c}'`;
+            const cql = `matinh='${filterScope.province_c}'`;
             await wmsManager.updateWMSLayer(
                 "ws_ranhgioi:rg_vn_xa_2025",
-                cqlXa,
+                cql,
                 false,
             );
 
             // Zoom lai ve tinh
-            const cqlTinh = `matinh='${filterScope.province_c}'`;
             await wmsManager.zoomToFilteredExtent(
                 WMS_URL_RANHGIOI,
                 "ws_ranhgioi:rg_vn_tinh_2025",
-                cqlTinh,
+                cqlTcqlinh,
             );
         }
     });
@@ -199,10 +189,7 @@ function resetFilter() {
 
     // Reset WMS layers
     wmsManager.updateWMSLayer("ws_ranhgioi:rg_vn_tinh_2025", null, false);
-    const xaConfig = wmsManager.getWmsConfigWithNameLayer(
-        "ws_ranhgioi:rg_vn_xa_2025",
-    );
-    if (xaConfig) wmsManager.removeWMSLayer(xaConfig.id);
+    wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_xa_2025");
 
     // Zoom lai ve extent mac dinh
     zoomToDefaultExtent();

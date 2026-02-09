@@ -52,6 +52,13 @@ class WMSLayerManager {
         return this.wmsConfigs.find((c) => c.layer === layerName);
     }
 
+    removeWmsLayerByNameLayer(layerName) {
+        const config = this.getWmsConfigWithNameLayer(layerName);
+        if (config) {
+            this.removeWMSLayer(config.id);
+        }
+    }
+
     /**
      * Cap nhat WMS layer (xoa cu, tao moi voi filter)
      * @param {string} layerName - Ten layer
@@ -475,10 +482,12 @@ class WMSLayerManager {
                 value !== undefined,
         );
 
-        let html = '<div style="min-width:240px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">';
+        let html =
+            "<div style=\"min-width:240px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;\">";
 
         // Header
-        html += '<div style="background:linear-gradient(135deg,#1565c0,#42a5f5);color:#fff;padding:8px 12px;">';
+        html +=
+            '<div style="background:linear-gradient(135deg,#1565c0,#42a5f5);color:#fff;padding:8px 12px;">';
         html += `<div style="font-size:13px;font-weight:600;"><i class="bi bi-layers-fill" style="margin-right:5px;opacity:0.8;"></i>${layerName}</div>`;
         if (entries.length > 0) {
             html += `<div style="font-size:10px;opacity:0.7;margin-top:2px;">${entries.length} thuoc tinh</div>`;
@@ -487,7 +496,8 @@ class WMSLayerManager {
 
         // Body
         if (entries.length === 0) {
-            html += '<div style="padding:14px;text-align:center;color:#999;font-size:12px;">Khong co thuoc tinh</div>';
+            html +=
+                '<div style="padding:14px;text-align:center;color:#999;font-size:12px;">Khong co thuoc tinh</div>';
         } else {
             html += '<div style="padding:4px 0;">';
             entries.forEach(([key, value], index) => {
