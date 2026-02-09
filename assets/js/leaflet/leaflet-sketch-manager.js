@@ -281,7 +281,8 @@ class SketchManager {
             }
 
             features.forEach((feature) => {
-                if (!feature.geometry || feature.geometry.type !== "Polygon") return;
+                if (!feature.geometry || feature.geometry.type !== "Polygon")
+                    return;
 
                 const coords = feature.geometry.coordinates[0];
                 const areaM2 = turf.area(feature);
@@ -324,8 +325,13 @@ class SketchManager {
                 if (coords.length > 3) {
                     for (let i = 0; i < coords.length - 1; i++) {
                         const from = turf.point([coords[i][0], coords[i][1]]);
-                        const to = turf.point([coords[i + 1][0], coords[i + 1][1]]);
-                        const distance = turf.distance(from, to, { units: "meters" });
+                        const to = turf.point([
+                            coords[i + 1][0],
+                            coords[i + 1][1],
+                        ]);
+                        const distance = turf.distance(from, to, {
+                            units: "meters",
+                        });
 
                         if (distance > 10) {
                             const midpoint = turf.midpoint(from, to);
@@ -426,25 +432,33 @@ class SketchManager {
 
         // DRAW MODE TOOLS
         const pointerBtn = this.createToolButton(
-            "Con trỏ", "bi-cursor", "Chế độ chọn đối tượng",
+            "Con trỏ",
+            "bi-cursor",
+            "Chế độ chọn đối tượng",
             () => this.setDrawMode(null),
         );
         pointerBtn.id = "sketch-pointer-btn";
 
         const drawBtn = this.createToolButton(
-            "Vẽ Polygon", "bi-pentagon-fill", "Bắt đầu vẽ polygon",
+            "Vẽ Polygon",
+            "bi-pentagon-fill",
+            "Bắt đầu vẽ polygon",
             () => this.setDrawMode("Polygon"),
         );
         drawBtn.id = "sketch-draw-btn";
 
         const editBtn = this.createToolButton(
-            "Chỉnh sửa", "bi-pencil-fill", "Chỉnh sửa đối tượng đã chọn",
+            "Chỉnh sửa",
+            "bi-pencil-fill",
+            "Chỉnh sửa đối tượng đã chọn",
             () => this.setDrawMode("edit"),
         );
         editBtn.id = "sketch-edit-btn";
 
         const removeBtn = this.createToolButton(
-            "Xóa", "bi-trash-fill", "Xóa đối tượng đã chọn",
+            "Xóa",
+            "bi-trash-fill",
+            "Xóa đối tượng đã chọn",
             () => this.handleRemoveSelected(),
         );
         removeBtn.id = "sketch-remove-btn";
@@ -456,32 +470,41 @@ class SketchManager {
 
         // Separator
         const separator = document.createElement("div");
-        separator.style.cssText = "height: 1px; background: #ddd; margin: 5px 0;";
+        separator.style.cssText =
+            "height: 1px; background: #ddd; margin: 5px 0;";
         toolbar.appendChild(separator);
 
         // ACTION BUTTONS
         const mergeBtn = this.createToolButton(
-            "Merge", "bi-subtract", "Chọn ít nhất 2 đối tượng để gộp",
+            "Merge",
+            "bi-subtract",
+            "Chọn ít nhất 2 đối tượng để gộp",
             () => this.handleMerge(),
         );
         mergeBtn.id = "sketch-merge-btn";
         mergeBtn.disabled = true;
 
         const copyWmsBtn = this.createToolButton(
-            "Copy WMS", "bi-folder-plus", "Chọn polygon WMS để copy",
+            "Copy WMS",
+            "bi-folder-plus",
+            "Chọn polygon WMS để copy",
             () => this.enableWMSSelection(),
         );
         copyWmsBtn.id = "sketch-copy-wms-btn";
 
         const saveBtn = this.createToolButton(
-            "Save", "bi-check2", "Không có polygon để lưu",
+            "Save",
+            "bi-check2",
+            "Không có polygon để lưu",
             () => this.handleSave(),
         );
         saveBtn.id = "sketch-save-btn";
         saveBtn.disabled = true;
 
         const splitBtn = this.createToolButton(
-            "Split", "bi-scissors", "Chọn 1 đối tượng để tách",
+            "Split",
+            "bi-scissors",
+            "Chọn 1 đối tượng để tách",
             () => this.handleSplit(),
         );
         splitBtn.id = "sketch-split-btn";
@@ -492,12 +515,9 @@ class SketchManager {
         toolbar.appendChild(saveBtn);
         toolbar.appendChild(splitBtn);
 
-        const sketchPanel = document.getElementById("sketchPanel");
+        const sketchPanel = document.getElementById("sketch-content");
         if (sketchPanel) {
-            const cardBody = sketchPanel.querySelector(".card-body");
-            if (cardBody) {
-                cardBody.appendChild(toolbar);
-            }
+            sketchPanel.appendChild(toolbar);
         }
         this.toolbar = toolbar;
     }
@@ -506,7 +526,8 @@ class SketchManager {
         const btn = document.createElement("button");
         btn.className = "btn btn-outline-secondary btn-sm";
         btn.title = title;
-        btn.style.cssText = "width: 100%; text-align: left; margin-bottom: 5px;";
+        btn.style.cssText =
+            "width: 100%; text-align: left; margin-bottom: 5px;";
         btn.innerHTML = `<i class="bi ${icon}"></i> ${label}`;
         btn.addEventListener("click", onClick);
         return btn;
@@ -644,29 +665,34 @@ class SketchManager {
         // Fix 4: Merge can chon >= 2
         if (mergeBtn) {
             mergeBtn.disabled = selectedCount < 2;
-            mergeBtn.title = selectedCount < 2
-                ? `Chọn ít nhất 2 đối tượng (đang chọn ${selectedCount})`
-                : `Gộp ${selectedCount} đối tượng`;
+            mergeBtn.title =
+                selectedCount < 2
+                    ? `Chọn ít nhất 2 đối tượng (đang chọn ${selectedCount})`
+                    : `Gộp ${selectedCount} đối tượng`;
         }
 
         if (saveBtn) {
             saveBtn.disabled = !saveable;
-            saveBtn.title = saveable ? "Lưu polygon" : "Không có polygon để lưu";
+            saveBtn.title = saveable
+                ? "Lưu polygon"
+                : "Không có polygon để lưu";
         }
 
         // Fix 5: Split can chon dung 1
         if (splitBtn) {
             splitBtn.disabled = selectedCount !== 1;
-            splitBtn.title = selectedCount !== 1
-                ? `Chọn đúng 1 đối tượng để tách (đang chọn ${selectedCount})`
-                : "Tách đối tượng đã chọn";
+            splitBtn.title =
+                selectedCount !== 1
+                    ? `Chọn đúng 1 đối tượng để tách (đang chọn ${selectedCount})`
+                    : "Tách đối tượng đã chọn";
         }
 
         // Remove can chon >= 1
         if (removeBtn) {
-            removeBtn.title = selectedCount > 0
-                ? `Xóa ${selectedCount} đối tượng đã chọn`
-                : "Chọn đối tượng để xóa";
+            removeBtn.title =
+                selectedCount > 0
+                    ? `Xóa ${selectedCount} đối tượng đã chọn`
+                    : "Chọn đối tượng để xóa";
         }
     }
 
@@ -696,7 +722,9 @@ class SketchManager {
 
             let merged = features[0];
             for (let i = 1; i < features.length; i++) {
-                merged = turf.union(turf.featureCollection([merged, features[i]]));
+                merged = turf.union(
+                    turf.featureCollection([merged, features[i]]),
+                );
             }
 
             // Xoa goc
@@ -750,7 +778,11 @@ class SketchManager {
             this.map.pm.enableDraw("Line");
 
             this.map.once("pm:create", (e) => {
-                if (this.isSplitMode && this.selectedPolygonForSplit && e.layer) {
+                if (
+                    this.isSplitMode &&
+                    this.selectedPolygonForSplit &&
+                    e.layer
+                ) {
                     this.performSplit(e.layer.toGeoJSON());
                     this.map.removeLayer(e.layer);
                 }
@@ -803,12 +835,20 @@ class SketchManager {
                 polygonFeature = gj;
             }
 
-            const thinBuffer = turf.buffer(splitLineGeoJSON, 0.0001, { units: "kilometers" });
-            const diff = turf.difference(turf.featureCollection([polygonFeature, thinBuffer]));
+            const thinBuffer = turf.buffer(splitLineGeoJSON, 0.0001, {
+                units: "kilometers",
+            });
+            const diff = turf.difference(
+                turf.featureCollection([polygonFeature, thinBuffer]),
+            );
 
             let splitResults = [];
 
-            if (diff && diff.geometry && diff.geometry.type === "MultiPolygon") {
+            if (
+                diff &&
+                diff.geometry &&
+                diff.geometry.type === "MultiPolygon"
+            ) {
                 diff.geometry.coordinates.forEach((coords) => {
                     splitResults.push({
                         type: "Feature",
@@ -816,7 +856,11 @@ class SketchManager {
                         properties: {},
                     });
                 });
-            } else if (diff && diff.geometry && diff.geometry.type === "Polygon") {
+            } else if (
+                diff &&
+                diff.geometry &&
+                diff.geometry.type === "Polygon"
+            ) {
                 alert("Đường cắt phải đi qua polygon để tách thành 2 phần");
                 this.exitSplitMode();
                 return;
@@ -826,7 +870,10 @@ class SketchManager {
                 this.sketchLayerGroup.removeLayer(this.selectedPolygonForSplit);
 
                 splitResults.forEach((part, index) => {
-                    const style = this.splitResultStyles[index % this.splitResultStyles.length];
+                    const style =
+                        this.splitResultStyles[
+                            index % this.splitResultStyles.length
+                        ];
                     const partLayer = L.geoJSON(part.geometry, { style });
 
                     partLayer._polygonId = this.generateUniquePolygonId();
@@ -862,7 +909,11 @@ class SketchManager {
         this.map.getContainer().style.cursor = "";
 
         if (this.map.pm) {
-            try { this.map.pm.disableDraw("Line"); } catch (e) { /* ignore */ }
+            try {
+                this.map.pm.disableDraw("Line");
+            } catch (e) {
+                /* ignore */
+            }
         }
     }
 
@@ -877,7 +928,9 @@ class SketchManager {
     }
 
     canPolygonBeSaved(layer) {
-        return layer && (!layer._isSaved || (layer._isSaved && layer._isModified));
+        return (
+            layer && (!layer._isSaved || (layer._isSaved && layer._isModified))
+        );
     }
 
     markPolygonAsSaved(layer) {
@@ -894,11 +947,15 @@ class SketchManager {
             if (this.selectedLayers.size === 0) {
                 // Neu chua chon va chi co duy nhat 1 layer -> tu dong chon no
                 const allLayers = this.sketchLayerGroup.getLayers();
-                const saveableAll = allLayers.filter((l) => this.canPolygonBeSaved(l));
+                const saveableAll = allLayers.filter((l) =>
+                    this.canPolygonBeSaved(l),
+                );
                 if (saveableAll.length === 1) {
                     toSave = saveableAll;
                 } else if (saveableAll.length > 1) {
-                    alert(`Có ${saveableAll.length} hình trên bản đồ. Hãy chọn tối đa ${this.options.maxElements} hình để lưu.`);
+                    alert(
+                        `Có ${saveableAll.length} hình trên bản đồ. Hãy chọn tối đa ${this.options.maxElements} hình để lưu.`,
+                    );
                     return;
                 } else {
                     alert("Không có polygon để lưu");
@@ -906,13 +963,19 @@ class SketchManager {
                 }
             } else {
                 // Chi lay cac layer da chon va co the save
-                toSave = Array.from(this.selectedLayers).filter((l) => this.canPolygonBeSaved(l));
+                toSave = Array.from(this.selectedLayers).filter((l) =>
+                    this.canPolygonBeSaved(l),
+                );
                 if (toSave.length === 0) {
-                    alert("Các hình đã chọn không thể lưu (đã lưu rồi hoặc không hợp lệ)");
+                    alert(
+                        "Các hình đã chọn không thể lưu (đã lưu rồi hoặc không hợp lệ)",
+                    );
                     return;
                 }
                 if (toSave.length > this.options.maxElements) {
-                    alert(`Chỉ cho phép lưu tối đa ${this.options.maxElements} hình mỗi lần. Đang chọn ${toSave.length} hình.`);
+                    alert(
+                        `Chỉ cho phép lưu tối đa ${this.options.maxElements} hình mỗi lần. Đang chọn ${toSave.length} hình.`,
+                    );
                     return;
                 }
             }
@@ -955,7 +1018,9 @@ class SketchManager {
             alert("Lưu thành công!");
 
             if (this.options.redirectAfterSave && this.options.redirectUrl) {
-                setTimeout(() => { window.location.href = this.options.redirectUrl; }, 1000);
+                setTimeout(() => {
+                    window.location.href = this.options.redirectUrl;
+                }, 1000);
             }
         } catch (error) {
             console.error("Loi khi luu polygon:", error);
@@ -966,7 +1031,10 @@ class SketchManager {
     layerToWKT(layer) {
         const geojson = layer.toGeoJSON();
         let feature;
-        if (geojson.type === "FeatureCollection" && geojson.features.length > 0) {
+        if (
+            geojson.type === "FeatureCollection" &&
+            geojson.features.length > 0
+        ) {
             feature = geojson.features[0];
         } else {
             feature = geojson;
@@ -1000,7 +1068,9 @@ class SketchManager {
             return `POLYGON((${wktCoords}))`;
         } else if (geometry.type === "MultiPolygon") {
             const polygons = geometry.coordinates.map((coords) => {
-                const wktCoords = coords[0].map((c) => `${c[0]} ${c[1]}`).join(", ");
+                const wktCoords = coords[0]
+                    .map((c) => `${c[0]} ${c[1]}`)
+                    .join(", ");
                 return `(${wktCoords})`;
             });
             return `MULTIPOLYGON(${polygons.join(", ")})`;
@@ -1055,10 +1125,18 @@ class SketchManager {
                 const layer = wmsManager.wmsLayers.get(config.id);
                 if (!layer) continue;
 
-                const result = await wmsManager.quickCheckFeatureInfo(event, layer, config);
+                const result = await wmsManager.quickCheckFeatureInfo(
+                    event,
+                    layer,
+                    config,
+                );
                 if (result && result.data && result.data.length > 0) {
                     const feature = result.data[0];
-                    if (feature.geometry && (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon")) {
+                    if (
+                        feature.geometry &&
+                        (feature.geometry.type === "Polygon" ||
+                            feature.geometry.type === "MultiPolygon")
+                    ) {
                         foundFeature = feature;
                         break;
                     }
@@ -1080,7 +1158,9 @@ class SketchManager {
 
     convertWMSToSketch(wmsFeature) {
         try {
-            const newLayer = L.geoJSON(wmsFeature.geometry, { style: this.fillStyle });
+            const newLayer = L.geoJSON(wmsFeature.geometry, {
+                style: this.fillStyle,
+            });
 
             newLayer._polygonId = this.generateUniquePolygonId();
             newLayer._isSaved = false;
@@ -1122,7 +1202,9 @@ class SketchManager {
                 try {
                     this.map.pm.disableDraw("Polygon");
                     this.map.pm.disableDraw("Line");
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    /* ignore */
+                }
             }
 
             this.sketchLayerGroup.eachLayer((layer) => {
@@ -1151,6 +1233,11 @@ class SketchManager {
             this.updateDrawModeButtonStates(null);
 
             this.isVisible = true;
+        }
+
+        // Trigger map resize to ensure controls reposition correctly
+        if (this.map && typeof this.map.invalidateSize === "function") {
+            setTimeout(() => this.map.invalidateSize(), 100);
         }
 
         return this.isVisible;

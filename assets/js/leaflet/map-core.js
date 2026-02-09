@@ -58,6 +58,9 @@ class MapApp {
         this.controlManager = null;
         this.sidebarLayoutManager = null;
         this._mapControlButtons = null;
+        this.basemapOffcanvas = null;
+        this.currentBasemapLayer = null;
+        this.currentBasemapId = this.config.basemaps?.default || "googleSatellite";
 
         // Coordinate converter
         this.coordConverter = new CoordinateConverter();
@@ -99,13 +102,19 @@ class MapApp {
         const mapConfig = this.config.map;
         const tileConfig = this.config.tileLayer;
 
+        // Create and store basemap layer
+        this.currentBasemapLayer = L.tileLayer(tileConfig.url, tileConfig.options);
+
         this.map = L.map(this.containerId, {
             center: mapConfig.center || [0, 0],
             zoom: mapConfig.center ? mapConfig.zoom : 2,
             minZoom: mapConfig.minZoom,
             maxZoom: mapConfig.maxZoom,
-            layers: [L.tileLayer(tileConfig.url, tileConfig.options)],
+            layers: [this.currentBasemapLayer],
         });
+
+        // Create basemap selector offcanvas
+        this._createBasemapOffcanvas();
     }
 
     /**
@@ -292,6 +301,73 @@ class MapApp {
     }
 
     /**
+     * Create basemap selector offcanvas
+     * @private
+     */
+    _createBasemapOffcanvas() {
+        const basemapsConfig = this.config.basemaps;
+        if (!basemapsConfig?.options) return;
+
+        // Create offcanvas element
+        const offcanvas = document.createElement("div");
+        offcanvas.className = "offcanvas offcanvas-end";
+        offcanvas.id = "basemap-offcanvas";
+        offcanvas.setAttribute("tabindex", "-1");
+
+        offcanvas.innerHTML = `
+            <div class="offcanvas-header">
+                <h5 class="offcanvas-title">Chon nen ban do</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+            </div>
+            <div class="offcanvas-body">
+                <div class="list-group" id="basemap-list">
+                    ${basemapsConfig.options.map(basemap => `
+                        <label class="list-group-item list-group-item-action" style="cursor: pointer;">
+                            <input class="form-check-input me-2" type="radio" name="basemap-radio" value="${basemap.id}"
+                                ${basemap.id === this.currentBasemapId ? 'checked' : ''}>
+                            ${basemap.name}
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(offcanvas);
+
+        // Initialize Bootstrap offcanvas
+        this.basemapOffcanvas = new bootstrap.Offcanvas(offcanvas);
+
+        // Add event listeners for radio buttons
+        offcanvas.querySelectorAll('input[name="basemap-radio"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.switchBasemap(e.target.value);
+            });
+        });
+    }
+
+    /**
+     * Switch basemap layer
+     * @param {string} basemapId - ID of basemap to switch to
+     */
+    switchBasemap(basemapId) {
+        const basemapsConfig = this.config.basemaps;
+        const basemap = basemapsConfig?.options.find(b => b.id === basemapId);
+
+        if (!basemap || !this.currentBasemapLayer) return;
+
+        // Remove current basemap
+        this.map.removeLayer(this.currentBasemapLayer);
+
+        // Add new basemap
+        this.currentBasemapLayer = L.tileLayer(basemap.url, basemap.options);
+        this.currentBasemapLayer.addTo(this.map);
+        this.currentBasemapId = basemapId;
+
+        // Move basemap to back (below WMS layers)
+        this.currentBasemapLayer.bringToBack();
+    }
+
+    /**
      * Initialize map controls (buttons and sidebar layout manager)
      * @private
      */
@@ -328,6 +404,47 @@ class MapApp {
                             this.sidebarLayoutManager?.openOffcanvas();
                         }
                     };
+                }
+                // Handle toggleBasemap action
+                else if (config.action === "toggleBasemap") {
+                    config.onClick = () => {
+                        if (this.basemapOffcanvas) {
+                            this.basemapOffcanvas.toggle();
+                        }
+                    };
+                }
+                // Handle resetView action
+                else if (config.action === "resetView") {
+                    config.onClick = () => {
+                        const defaultCenter = this.config.map.center;
+                        const defaultZoom = this.config.map.zoom;
+                        if (defaultCenter) {
+                            this.map.setView(defaultCenter, defaultZoom, {
+                                animate: true,
+                                duration: 0.5
+                            });
+                        }
+                    };
+                }
+                // Handle toggleFullscreen action
+                else if (config.action === "toggleFullscreen") {
+                    config.onClick = () => {
+                        const mapContainer = this.map.getContainer();
+                        if (!document.fullscreenElement) {
+                            mapContainer.requestFullscreen().catch(err => {
+                                console.error("Fullscreen error:", err);
+                            });
+                        } else {
+                            document.exitFullscreen();
+                        }
+
+                        // Trigger resize after fullscreen change
+                        setTimeout(() => this.map.invalidateSize(), 200);
+                    };
+                }
+                // Fallback: if onClick function is provided in config, keep it
+                else if (typeof config.onClick === 'function') {
+                    // Keep custom onClick function from config
                 }
 
                 return config;
@@ -826,6 +943,15 @@ class MapApp {
         if (this.controlManager) {
             this.controlManager.destroy();
             this.controlManager = null;
+        }
+
+        if (this.basemapOffcanvas) {
+            const offcanvasEl = document.getElementById("basemap-offcanvas");
+            if (offcanvasEl) {
+                this.basemapOffcanvas.dispose();
+                offcanvasEl.remove();
+            }
+            this.basemapOffcanvas = null;
         }
 
         if (this.sidebarLayoutManager) {

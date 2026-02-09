@@ -163,7 +163,7 @@ class SidebarLayoutManager {
     _createOffcanvas() {
         // Create offcanvas structure
         const offcanvas = document.createElement("div");
-        offcanvas.className = "offcanvas offcanvas-start";
+        offcanvas.className = "offcanvas offcanvas-end";
         offcanvas.id = this.offcanvasId;
         offcanvas.setAttribute("tabindex", "-1");
         offcanvas.style.width = "400px";
@@ -278,6 +278,15 @@ class SidebarLayoutManager {
     openOffcanvas() {
         if (this.bsOffcanvas && !this.isPinnedState) {
             this.bsOffcanvas.show();
+        }
+    }
+
+    /**
+     * Close the offcanvas
+     */
+    closeOffcanvas() {
+        if (this.bsOffcanvas) {
+            this.bsOffcanvas.hide();
         }
     }
 

@@ -14,13 +14,68 @@ const DEFAULT_MAP_CONFIG = {
         maxZoom: 20,
     },
 
-    // Tile layer settings
+    // Tile layer settings (default basemap)
     tileLayer: {
         url: "http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}",
         options: {
             maxZoom: 20,
             subdomains: ["mt0", "mt1", "mt2", "mt3"],
         },
+    },
+
+    // Basemap options
+    basemaps: {
+        default: "googleSatellite", // ID của basemap mặc định
+        options: [
+            {
+                id: "googleSatellite",
+                name: "Google Satellite",
+                url: "http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}",
+                options: {
+                    maxZoom: 20,
+                    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+                    attribution: "Google Maps"
+                }
+            },
+            {
+                id: "googleStreets",
+                name: "Google Streets",
+                url: "http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+                options: {
+                    maxZoom: 20,
+                    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+                    attribution: "Google Maps"
+                }
+            },
+            {
+                id: "googleHybrid",
+                name: "Google Hybrid",
+                url: "http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+                options: {
+                    maxZoom: 20,
+                    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+                    attribution: "Google Maps"
+                }
+            },
+            {
+                id: "osm",
+                name: "OpenStreetMap",
+                url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                options: {
+                    maxZoom: 19,
+                    attribution: "OpenStreetMap contributors"
+                }
+            },
+            {
+                id: "cartoDB",
+                name: "CartoDB Light",
+                url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+                options: {
+                    maxZoom: 19,
+                    attribution: "CartoDB"
+                }
+            }
+        ]
     },
 
     // WMS settings
@@ -71,6 +126,18 @@ const DEFAULT_MAP_CONFIG = {
                 icon: "bi-tools",
                 title: "Cong cu",
                 action: "toggleSidebar",
+            },
+            {
+                id: "map-ctrl-basemap",
+                icon: "bi-layers",
+                title: "Chon nen ban do",
+                action: "toggleBasemap",
+            },
+            {
+                id: "map-ctrl-fullscreen",
+                icon: "bi-fullscreen",
+                title: "Toan man hinh",
+                action: "toggleFullscreen",
             },
         ],
     },
