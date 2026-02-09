@@ -82,35 +82,29 @@
 
     <body class="bg-light">
         <div class="container-fluid mt-2">
-            <div class="row g-2" id="main-row">
-                <!-- Map: col-12 mặc định (full-screen) -->
-                <div class="col-12" id="map-col">
-                    <div class="card shadow-sm h-100">
-                        <div
-                            class="card-header d-flex align-items-center justify-content-between py-1"
-                        >
-                            <h6 class="mb-0 small">
-                                <i class="bi bi-geo-alt-fill text-danger"></i>
-                                Ban do
-                            </h6>
-                            <span
-                                class="badge bg-success"
-                                id="mapStatus"
-                                style="font-size: 0.7rem"
-                                >San sang</span
-                            >
-                        </div>
-                        <div class="card-body p-1">
-                            <div id="map"></div>
-                        </div>
-                    </div>
+            <!-- Map Card - JS will automatically create row/col structure -->
+            <div class="card shadow-sm h-100">
+                <div
+                    class="card-header d-flex align-items-center justify-content-between py-1"
+                >
+                    <h6 class="mb-0 small">
+                        <i class="bi bi-geo-alt-fill text-danger"></i>
+                        Ban do
+                    </h6>
+                    <span
+                        class="badge bg-success"
+                        id="mapStatus"
+                        style="font-size: 0.7rem"
+                        >San sang</span
+                    >
                 </div>
-
-                <!-- Sidebar: ẩn mặc định, hiện khi pin -->
-                <div class="col-lg-4" id="sidebar-col" style="display: none;">
-                    <div class="panel-scroll" id="sidebar"></div>
+                <div class="card-body p-1">
+                    <div id="map"></div>
                 </div>
             </div>
+
+            <!-- Sidebar content - will be moved into offcanvas or pinned column by JS -->
+            <div id="sidebar"></div>
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

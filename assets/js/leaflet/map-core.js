@@ -300,11 +300,10 @@ class MapApp {
         const sidebarConfig = this.config.sidebar;
 
         // 1. Create SidebarLayoutManager
-        if (sidebarConfig?.mapColId && sidebarConfig?.sidebarColId) {
+        if (sidebarConfig?.containerId) {
             this.sidebarLayoutManager = new SidebarLayoutManager({
                 map: this.map,
-                mapColId: sidebarConfig.mapColId,
-                sidebarColId: sidebarConfig.sidebarColId,
+                mapContainerId: this.containerId,
                 sidebarContentId: sidebarConfig.containerId,
             });
             this.sidebarLayoutManager.init();

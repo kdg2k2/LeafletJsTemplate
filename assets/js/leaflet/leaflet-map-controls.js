@@ -17,7 +17,7 @@ function createMapControlButtons(map, buttonConfigs, options = {}) {
         onAdd(_map) {
             const container = L.DomUtil.create(
                 "div",
-                "leaflet-bar leaflet-control",
+                "leaflet-bar leaflet-control"
             );
             L.DomEvent.disableClickPropagation(container);
             L.DomEvent.disableScrollPropagation(container);
@@ -52,44 +52,108 @@ function createMapControlButtons(map, buttonConfigs, options = {}) {
 
 /**
  * SidebarLayoutManager - Manages sidebar layout between offcanvas and pinned modes
- * Handles DOM movement without cloning (preserving events and state)
+ * Automatically creates entire layout structure - HTML only needs <div id="map"></div>
  */
 class SidebarLayoutManager {
     /**
      * @param {Object} config
      * @param {L.Map} config.map - Leaflet map instance
-     * @param {string} config.mapColId - ID of map column element
-     * @param {string} config.sidebarColId - ID of sidebar column element
+     * @param {string} config.mapContainerId - ID of map div
      * @param {string} config.sidebarContentId - ID of sidebar content element
      * @param {string} [config.offcanvasId="sidebar-offcanvas"] - ID for offcanvas element
      */
-    constructor({
-        map,
-        mapColId,
-        sidebarColId,
-        sidebarContentId,
-        offcanvasId,
-    }) {
+    constructor({ map, mapContainerId, sidebarContentId, offcanvasId }) {
         this.map = map;
-        this.mapColId = mapColId;
-        this.sidebarColId = sidebarColId;
+        this.mapContainerId = mapContainerId;
         this.sidebarContentId = sidebarContentId;
         this.offcanvasId = offcanvasId || "sidebar-offcanvas";
+
+        // Generated element IDs
+        this.rowId = `${mapContainerId}-row`;
+        this.mapColId = `${mapContainerId}-col`;
+        this.sidebarColId = `${mapContainerId}-sidebar-col`;
 
         this.offcanvasElement = null;
         this.bsOffcanvas = null;
         this.isPinnedState = false;
         this.unpinButton = null;
+
+        // Store original map parent for cleanup
+        this.originalMapParent = null;
+        this.createdElements = [];
     }
 
     /**
      * Initialize the sidebar layout manager
-     * Creates offcanvas and sets up default layout (fullscreen map)
+     * Creates entire layout structure and offcanvas
      */
     init() {
+        this._createLayoutStructure();
         this._createOffcanvas();
         this._setupDefaultLayout();
         this._setupEventListeners();
+    }
+
+    /**
+     * Create the row/col layout structure dynamically
+     * Wraps #map in a Bootstrap grid layout
+     * @private
+     */
+    _createLayoutStructure() {
+        const mapDiv = document.getElementById(this.mapContainerId);
+        if (!mapDiv) {
+            console.error(`Map container #${this.mapContainerId} not found`);
+            return;
+        }
+
+        // Create row wrapper
+        const row = document.createElement("div");
+        row.id = this.rowId;
+        row.className = "row g-2";
+
+        // Create map column
+        const mapCol = document.createElement("div");
+        mapCol.id = this.mapColId;
+        mapCol.className = "col-12"; // Fullscreen by default
+
+        // Wrap the map card if it exists, or create one
+        const mapCard = mapDiv.closest(".card");
+        if (mapCard) {
+            // Store original parent (container of the card)
+            this.originalMapParent = mapCard.parentElement;
+
+            // Move entire card into map column
+            mapCard.parentNode.removeChild(mapCard);
+            mapCol.appendChild(mapCard);
+        } else {
+            // Store original parent (container of the map div)
+            this.originalMapParent = mapDiv.parentElement;
+
+            // Just move map div into column
+            mapDiv.parentNode.removeChild(mapDiv);
+            mapCol.appendChild(mapDiv);
+        }
+
+        // Create sidebar column (hidden by default)
+        const sidebarCol = document.createElement("div");
+        sidebarCol.id = this.sidebarColId;
+        sidebarCol.className = "col-lg-4";
+        sidebarCol.style.display = "none";
+
+        // Create panel-scroll wrapper inside sidebar column
+        const panelScroll = document.createElement("div");
+        panelScroll.className = "panel-scroll";
+        sidebarCol.appendChild(panelScroll);
+
+        // Assemble structure
+        row.appendChild(mapCol);
+        row.appendChild(sidebarCol);
+
+        // Insert row in place of original structure
+        this.originalMapParent.appendChild(row);
+
+        // Track created elements for cleanup
+        this.createdElements.push(row);
     }
 
     /**
@@ -148,6 +212,9 @@ class SidebarLayoutManager {
 
         this.offcanvasElement = offcanvas;
         this.bsOffcanvas = new bootstrap.Offcanvas(offcanvas);
+
+        // Track for cleanup
+        this.createdElements.push(offcanvas);
     }
 
     /**
@@ -157,7 +224,7 @@ class SidebarLayoutManager {
     _setupDefaultLayout() {
         const sidebarContent = document.getElementById(this.sidebarContentId);
         const offcanvasBody = document.getElementById(
-            `${this.offcanvasId}-body`,
+            `${this.offcanvasId}-body`
         );
         const mapCol = document.getElementById(this.mapColId);
         const sidebarCol = document.getElementById(this.sidebarColId);
@@ -170,7 +237,7 @@ class SidebarLayoutManager {
         // Move sidebar content into offcanvas
         offcanvasBody.appendChild(sidebarContent);
 
-        // Set fullscreen layout
+        // Ensure fullscreen layout
         if (mapCol) {
             mapCol.className = "col-12";
         }
@@ -189,7 +256,6 @@ class SidebarLayoutManager {
         if (!this.offcanvasElement) return;
 
         this.offcanvasElement.addEventListener("shown.bs.offcanvas", () => {
-            // Invalidate map size after offcanvas is shown
             setTimeout(() => {
                 if (this.map) {
                     this.map.invalidateSize();
@@ -198,7 +264,6 @@ class SidebarLayoutManager {
         });
 
         this.offcanvasElement.addEventListener("hidden.bs.offcanvas", () => {
-            // Invalidate map size after offcanvas is hidden
             setTimeout(() => {
                 if (this.map) {
                     this.map.invalidateSize();
@@ -218,7 +283,6 @@ class SidebarLayoutManager {
 
     /**
      * Pin the sidebar to a fixed column layout
-     * Moves from offcanvas to 2-column layout (map col-lg-8 + sidebar col-lg-4)
      */
     pin() {
         if (this.isPinnedState) return;
@@ -232,39 +296,32 @@ class SidebarLayoutManager {
             return;
         }
 
-        // Close offcanvas first
         if (this.bsOffcanvas) {
             this.bsOffcanvas.hide();
         }
 
-        // Find or create .panel-scroll wrapper in sidebar column
-        let panelScroll = sidebarCol.querySelector(".panel-scroll");
+        const panelScroll = sidebarCol.querySelector(".panel-scroll");
         if (!panelScroll) {
-            panelScroll = document.createElement("div");
-            panelScroll.className = "panel-scroll";
-            sidebarCol.appendChild(panelScroll);
+            console.error("panel-scroll not found");
+            return;
         }
 
-        // Move sidebar content to column
         panelScroll.appendChild(sidebarContent);
 
-        // Create unpin button
         this._createUnpinButton();
         if (this.unpinButton) {
             sidebarContent.insertBefore(
                 this.unpinButton,
-                sidebarContent.firstChild,
+                sidebarContent.firstChild
             );
         }
 
-        // Switch layout to 2-column
         mapCol.className = "col-lg-8";
         sidebarCol.className = "col-lg-4";
         sidebarCol.style.display = "";
 
         this.isPinnedState = true;
 
-        // Invalidate map size after layout change
         setTimeout(() => {
             if (this.map) {
                 this.map.invalidateSize();
@@ -274,14 +331,13 @@ class SidebarLayoutManager {
 
     /**
      * Unpin the sidebar back to offcanvas mode
-     * Moves from 2-column layout back to fullscreen map with offcanvas
      */
     unpin() {
         if (!this.isPinnedState) return;
 
         const sidebarContent = document.getElementById(this.sidebarContentId);
         const offcanvasBody = document.getElementById(
-            `${this.offcanvasId}-body`,
+            `${this.offcanvasId}-body`
         );
         const mapCol = document.getElementById(this.mapColId);
         const sidebarCol = document.getElementById(this.sidebarColId);
@@ -291,16 +347,13 @@ class SidebarLayoutManager {
             return;
         }
 
-        // Remove unpin button
         if (this.unpinButton && this.unpinButton.parentNode) {
             this.unpinButton.parentNode.removeChild(this.unpinButton);
             this.unpinButton = null;
         }
 
-        // Move sidebar content back to offcanvas
         offcanvasBody.appendChild(sidebarContent);
 
-        // Switch layout to fullscreen
         if (mapCol) {
             mapCol.className = "col-12";
         }
@@ -310,7 +363,6 @@ class SidebarLayoutManager {
 
         this.isPinnedState = false;
 
-        // Invalidate map size after layout change
         setTimeout(() => {
             if (this.map) {
                 this.map.invalidateSize();
@@ -319,7 +371,7 @@ class SidebarLayoutManager {
     }
 
     /**
-     * Create the unpin button that appears at top of pinned sidebar
+     * Create the unpin button
      * @private
      */
     _createUnpinButton() {
@@ -327,7 +379,8 @@ class SidebarLayoutManager {
         btn.type = "button";
         btn.id = "sidebar-unpin-btn";
         btn.className = "btn btn-sm btn-outline-secondary w-100 mb-2";
-        btn.innerHTML = '<i class="bi bi-pin-angle-fill"></i> Bỏ ghim sidebar';
+        btn.innerHTML =
+            '<i class="bi bi-pin-angle-fill"></i> Bỏ ghim sidebar';
         btn.addEventListener("click", () => this.unpin());
         this.unpinButton = btn;
     }
@@ -341,37 +394,32 @@ class SidebarLayoutManager {
     }
 
     /**
-     * Destroy the sidebar layout manager and cleanup
+     * Destroy and cleanup
      */
     destroy() {
-        // Remove event listeners
-        if (this.offcanvasElement) {
-            this.offcanvasElement.removeEventListener(
-                "shown.bs.offcanvas",
-                null,
-            );
-            this.offcanvasElement.removeEventListener(
-                "hidden.bs.offcanvas",
-                null,
-            );
+        // Move sidebar content back if needed
+        const sidebarContent = document.getElementById(this.sidebarContentId);
+        if (sidebarContent && this.originalMapParent) {
+            this.originalMapParent.appendChild(sidebarContent);
         }
 
-        // Dispose Bootstrap offcanvas
         if (this.bsOffcanvas) {
             this.bsOffcanvas.dispose();
             this.bsOffcanvas = null;
         }
 
-        // Remove offcanvas element
-        if (this.offcanvasElement && this.offcanvasElement.parentNode) {
-            this.offcanvasElement.parentNode.removeChild(this.offcanvasElement);
-            this.offcanvasElement = null;
-        }
+        this.createdElements.forEach((el) => {
+            if (el && el.parentNode) {
+                el.parentNode.removeChild(el);
+            }
+        });
+        this.createdElements = [];
 
-        // Remove unpin button if exists
         if (this.unpinButton && this.unpinButton.parentNode) {
             this.unpinButton.parentNode.removeChild(this.unpinButton);
             this.unpinButton = null;
         }
+
+        this.offcanvasElement = null;
     }
 }

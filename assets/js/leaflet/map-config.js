@@ -52,9 +52,7 @@ const DEFAULT_MAP_CONFIG = {
     // Sidebar settings
     sidebar: {
         containerId: "sidebar",
-        mapColId: "map-col",
-        sidebarColId: "sidebar-col",
-        defaultMode: "pinned", // "offcanvas" | "pinned"
+        defaultMode: "offcanvas", // "offcanvas" | "pinned"
         panels: {
             filter: { enabled: true, order: 1 },
             wms: { enabled: true, order: 2 },
