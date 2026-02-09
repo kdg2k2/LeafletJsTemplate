@@ -34,13 +34,13 @@
             }
 
             #map {
-                height: calc(93vh - 40px);
+                height: calc(98vh - 40px);
                 width: 100%;
                 border-radius: 0.375rem;
             }
 
             .panel-scroll {
-                height: 93vh;
+                height: 98vh;
                 overflow-y: auto;
             }
 
@@ -75,15 +75,6 @@
     </head>
 
     <body class="bg-light">
-        <!-- Navbar -->
-        <nav class="navbar navbar-dark bg-dark py-2">
-            <div class="container-fluid">
-                <span class="navbar-brand mb-0 h6">
-                    <i class="bi bi-map"></i> Leaflet Map Template
-                </span>
-            </div>
-        </nav>
-
         <div class="container-fluid mt-2">
             <div class="row g-2">
                 <!-- Cot 1: Ban do -->
@@ -184,91 +175,6 @@
                             </div>
                         </div>
 
-                        <!-- Truy van WFS -->
-                        <div class="card shadow-sm mb-2">
-                            <div
-                                class="card-header py-1"
-                                role="button"
-                                data-bs-toggle="collapse"
-                                data-bs-target="#wfsQueryPanel"
-                            >
-                                <h6 class="mb-0 small">
-                                    <i class="bi bi-search text-info"></i> Truy
-                                    van WFS
-                                </h6>
-                            </div>
-                            <div class="collapse" id="wfsQueryPanel">
-                                <div class="card-body">
-                                    <div class="mb-2">
-                                        <label
-                                            class="form-label small fw-semibold mb-1"
-                                            >Ten lop</label
-                                        >
-                                        <input
-                                            type="text"
-                                            class="form-control form-control-sm"
-                                            id="layerName"
-                                            value="ws_ranhgioi:rg_vn_tinh_2025"
-                                        />
-                                    </div>
-                                    <div class="mb-2">
-                                        <label
-                                            class="form-label small fw-semibold mb-1"
-                                            >Bo loc CQL</label
-                                        >
-                                        <input
-                                            type="text"
-                                            class="form-control form-control-sm"
-                                            id="cqlFilter"
-                                            placeholder="VD: matinh='01'"
-                                        />
-                                    </div>
-                                    <div class="mb-2">
-                                        <label
-                                            class="form-label small fw-semibold mb-1"
-                                            >So luong toi da</label
-                                        >
-                                        <input
-                                            type="number"
-                                            class="form-control form-control-sm"
-                                            id="maxFeatures"
-                                            value="10"
-                                        />
-                                    </div>
-                                    <div class="d-grid gap-1">
-                                        <button
-                                            class="btn btn-primary btn-sm"
-                                            onclick="testFetchGeoJSON()"
-                                        >
-                                            <i class="bi bi-download"></i> Tai
-                                            GeoJSON
-                                        </button>
-                                        <button
-                                            class="btn btn-success btn-sm"
-                                            onclick="testHighlight()"
-                                        >
-                                            <i class="bi bi-highlighter"></i> To
-                                            sang tren ban do
-                                        </button>
-                                        <button
-                                            class="btn btn-info btn-sm text-white"
-                                            onclick="testZoomToBounds()"
-                                        >
-                                            <i class="bi bi-zoom-in"></i> Phong
-                                            to den vung
-                                        </button>
-                                        <button
-                                            class="btn btn-outline-danger btn-sm"
-                                            onclick="clearHighlights()"
-                                        >
-                                            <i class="bi bi-eraser"></i> Xoa to
-                                            sang
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Quan ly diem -->
                         <div class="card shadow-sm mb-2">
                             <div
@@ -363,7 +269,9 @@
                                 data-bs-target="#sketchPanel"
                             >
                                 <h6 class="mb-0 small">
-                                    <i class="bi bi-pencil-square text-warning"></i>
+                                    <i
+                                        class="bi bi-pencil-square text-warning"
+                                    ></i>
                                     Ve va chinh sua
                                 </h6>
                             </div>
@@ -374,7 +282,8 @@
                                         id="sketch-toggle-btn"
                                         onclick="toggleSketchMode()"
                                     >
-                                        <i class="bi bi-pencil"></i> Bat sketch tools
+                                        <i class="bi bi-pencil"></i> Bat sketch
+                                        tools
                                     </button>
                                 </div>
                             </div>

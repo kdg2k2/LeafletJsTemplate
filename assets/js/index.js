@@ -1,5 +1,5 @@
 // ========================================
-// BIEN TOAN CUC
+// UTILITY FUNCTIONS
 // ========================================
 function uniqid(prefix = "", moreEntropy = false) {
     const sec = Date.now() * 1000 + Math.random() * 1000;
@@ -7,18 +7,18 @@ function uniqid(prefix = "", moreEntropy = false) {
     return `${prefix}${id}${moreEntropy ? "." + Math.trunc(Math.random() * 100000000) : ""}`;
 }
 
-var filterScope = {
-    province_c: null,
-    commune_c: null,
-};
-
+// ========================================
+// CONSTANTS - CAU HINH HE THONG
+// ========================================
 const WMS_RANHGIOI = [
     "ws_ranhgioi:rg_vn_tinh_2025",
     "ws_ranhgioi:rg_vn_xa_2025",
 ];
 
-const WMS_URL_RANHGIOI =
-    "https://bando.ifee.edu.vn:8453/geoserver/ws_ranhgioi/wms";
+const WMS_URL_RANHGIOI = "https://bando.ifee.edu.vn:8453/geoserver/ws_ranhgioi/wms";
+
+const MAP_CENTER = null; // null = tu dong lay tu WMS defaultVisible, hoac [lat, lng]
+const MAP_ZOOM = 6;
 
 const DEFAULT_WMS_LAYERS = [
     {
@@ -44,22 +44,16 @@ const DEFAULT_WMS_LAYERS = [
 ];
 
 // ========================================
-// KHOI TAO BAN DO
+// GLOBAL VARIABLES - BIEN TOAN CUC
 // ========================================
-const MAP_CENTER = null; // null = tu dong lay tu WMS defaultVisible, hoac [lat, lng]
-const MAP_ZOOM = 6;
+var filterScope = {
+    province_c: null,
+    commune_c: null,
+};
 
-function zoomToDefaultExtent() {
-    if (MAP_CENTER) {
-        map.flyTo(MAP_CENTER, MAP_ZOOM, { duration: 0.5 });
-    } else {
-        const config = DEFAULT_WMS_LAYERS.find((c) => c.defaultVisible);
-        if (config) {
-            wmsManager.zoomToFilteredExtent(config.url, config.layer, null);
-        }
-    }
-}
-
+// ========================================
+// MAP INITIALIZATION - KHOI TAO BAN DO
+// ========================================
 const map = L.map("map", {
     center: MAP_CENTER || [0, 0],
     zoom: MAP_CENTER ? MAP_ZOOM : 2,
@@ -72,7 +66,7 @@ const map = L.map("map", {
 });
 
 // ========================================
-// KHOI TAO MANAGERS
+// MANAGERS INITIALIZATION - KHOI TAO MANAGERS
 // ========================================
 const wmsManager = new WMSLayerManager(map, DEFAULT_WMS_LAYERS);
 const pointManager = new PointManager(map, {
@@ -80,179 +74,27 @@ const pointManager = new PointManager(map, {
     defaultIconSize: 32,
     popupEnabled: true,
 });
-
-// Render WMS list + load mac dinh
-wmsManager.initializeWMSList(document.getElementById("wmsListContainer"));
-wmsManager.loadDefaultWMSLayers();
-
-// Auto zoom toi extent mac dinh
-zoomToDefaultExtent();
+const sketchManager = new SketchManager(map, {
+    enableSave: true,
+    enableMerge: true,
+    enableSplit: true,
+    maxElements: 1,
+    apiEndpoint: "/api/polygons/save",
+    redirectAfterSave: false,
+});
 
 // ========================================
-// LOC TINH / XA -> CQL FILTER -> WMS
+// HELPER FUNCTIONS - CAC HAM HO TRO
 // ========================================
-// Xu ly chon tinh
-document
-    .getElementById("province_code")
-    .addEventListener("change", async (e) => {
-        const provinceCode = e.target.value;
-
-        // Cap nhat filterScope
-        filterScope.province_c = provinceCode || null;
-        filterScope.commune_c = null;
-
-        // Reset select xa
-        await loadCommuneListByProvince(provinceCode);
-
-        // Xoa highlight cu
-        clearHighlights();
-
-        if (provinceCode) {
-            // Cap nhat WMS ranh gioi tinh voi CQL filter
-            const cqlTinh = `matinh='${provinceCode}'`;
-            await wmsManager.updateWMSLayer(
-                "ws_ranhgioi:rg_vn_tinh_2025",
-                cqlTinh,
-                true,
-            );
-
-            // Bat lop ranh gioi xa voi CQL filter cung tinh
-            const cqlXa = `matinh='${provinceCode}'`;
-            await wmsManager.updateWMSLayer(
-                "ws_ranhgioi:rg_vn_xa_2025",
-                cqlXa,
-                false,
-            );
-        } else {
-            // Reset ve mac dinh: ranh tinh khong filter, an ranh xa
-            await wmsManager.updateWMSLayer(
-                "ws_ranhgioi:rg_vn_tinh_2025",
-                null,
-                false,
-            );
-
-            // Xoa ranh xa
-            wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_xa_2025");
+function zoomToDefaultExtent() {
+    if (MAP_CENTER) {
+        map.flyTo(MAP_CENTER, MAP_ZOOM, { duration: 0.5 });
+    } else {
+        const config = DEFAULT_WMS_LAYERS.find((c) => c.defaultVisible);
+        if (config) {
+            wmsManager.zoomToFilteredExtent(config.url, config.layer, null);
         }
-    });
-
-// Xu ly chon xa
-document
-    .getElementById("commune_code")
-    .addEventListener("change", async (e) => {
-        const communeCode = e.target.value;
-
-        // Cap nhat filterScope
-        filterScope.commune_c = communeCode || null;
-
-        // Xoa highlight cu
-        clearHighlights();
-
-        if (communeCode) {
-            // Xoa lop ranh gioi tinh
-            wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_tinh_2025");
-
-            // Cap nhat WMS ranh gioi xa voi CQL filter theo xa
-            await wmsManager.updateWMSLayer(
-                "ws_ranhgioi:rg_vn_xa_2025",
-                `maxa='${communeCode}'`,
-                true,
-            );
-        } else if (filterScope.province_c) {
-            // Quay lai hien tat ca xa cua tinh
-            const cql = `matinh='${filterScope.province_c}'`;
-            await wmsManager.updateWMSLayer(
-                "ws_ranhgioi:rg_vn_xa_2025",
-                cql,
-                false,
-            );
-
-            // Zoom lai ve tinh
-            await wmsManager.zoomToFilteredExtent(
-                WMS_URL_RANHGIOI,
-                "ws_ranhgioi:rg_vn_tinh_2025",
-                cql,
-            );
-        }
-    });
-
-// Reset bo loc
-function resetFilter() {
-    document.getElementById("province_code").value = "";
-    document.getElementById("commune_code").value = "";
-    fillSelect("commune_code", [], "code", "name", "[Chon xa/phuong]");
-
-    filterScope.province_c = null;
-    filterScope.commune_c = null;
-
-    clearHighlights();
-
-    // Clear stored filters
-    wmsManager.clearAllFilters();
-
-    // Reset WMS layers
-    wmsManager.updateWMSLayer("ws_ranhgioi:rg_vn_tinh_2025", null, false);
-    wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_xa_2025");
-
-    // Zoom lai ve extent mac dinh
-    zoomToDefaultExtent();
-}
-
-// Load danh sach tinh khi trang tai xong
-loadProvinceList();
-
-// ========================================
-// TRUY VAN WFS (test)
-// ========================================
-let lastFetchedGeoJSON = null;
-
-async function testFetchGeoJSON() {
-    const layerName = document.getElementById("layerName").value;
-    const cqlFilter = document.getElementById("cqlFilter").value || null;
-    const maxFeatures =
-        parseInt(document.getElementById("maxFeatures").value) || 10;
-
-    const wfsUrl = wmsManager.wfsUtil.generateWFSUrl(WMS_URL_RANHGIOI);
-
-    try {
-        const geojson = await wmsManager.wfsUtil.fetchFeatureGeoJSON(
-            wfsUrl,
-            layerName,
-            cqlFilter,
-            maxFeatures,
-        );
-        lastFetchedGeoJSON = geojson;
-    } catch (error) {
-        console.error("Loi:", error);
     }
-}
-
-async function testHighlight() {
-    if (!lastFetchedGeoJSON) return;
-    wmsManager.wfsUtil.highlightPolygonOnMap(
-        map,
-        lastFetchedGeoJSON,
-        "testHighlight",
-    );
-}
-
-function testZoomToBounds() {
-    if (
-        !lastFetchedGeoJSON ||
-        !lastFetchedGeoJSON.features ||
-        lastFetchedGeoJSON.features.length === 0
-    )
-        return;
-    const bounds = wmsManager.wfsUtil.calculateBounds(
-        lastFetchedGeoJSON.features,
-    );
-    map.fitBounds(
-        [
-            [bounds.ymin, bounds.xmin],
-            [bounds.ymax, bounds.xmax],
-        ],
-        { padding: [20, 20] },
-    );
 }
 
 function clearHighlights() {
@@ -265,18 +107,93 @@ function clearHighlights() {
 }
 
 // ========================================
-// QUAN LY DIEM
+// FILTER FUNCTIONS - XU LY LOC TINH/XA
+// ========================================
+function resetFilter() {
+    document.getElementById("province_code").value = "";
+    document.getElementById("commune_code").value = "";
+    fillSelect("commune_code", [], "code", "name", "[Chon xa/phuong]");
+
+    filterScope.province_c = null;
+    filterScope.commune_c = null;
+
+    clearHighlights();
+    wmsManager.clearAllFilters();
+
+    // Reset WMS layers
+    wmsManager.updateWMSLayer("ws_ranhgioi:rg_vn_tinh_2025", null, false);
+    wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_xa_2025");
+
+    zoomToDefaultExtent();
+}
+
+async function handleProvinceChange(provinceCode) {
+    // Cap nhat filterScope
+    filterScope.province_c = provinceCode || null;
+    filterScope.commune_c = null;
+
+    // Reset select xa
+    await loadCommuneListByProvince(provinceCode);
+    clearHighlights();
+
+    if (provinceCode) {
+        // Cap nhat WMS ranh gioi tinh voi CQL filter
+        const cqlTinh = `matinh='${provinceCode}'`;
+        await wmsManager.updateWMSLayer("ws_ranhgioi:rg_vn_tinh_2025", cqlTinh, true);
+
+        // Bat lop ranh gioi xa voi CQL filter cung tinh
+        const cqlXa = `matinh='${provinceCode}'`;
+        await wmsManager.updateWMSLayer("ws_ranhgioi:rg_vn_xa_2025", cqlXa, false);
+    } else {
+        // Reset ve mac dinh: ranh tinh khong filter, an ranh xa
+        await wmsManager.updateWMSLayer("ws_ranhgioi:rg_vn_tinh_2025", null, false);
+        wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_xa_2025");
+    }
+}
+
+async function handleCommuneChange(communeCode) {
+    // Cap nhat filterScope
+    filterScope.commune_c = communeCode || null;
+    clearHighlights();
+
+    if (communeCode) {
+        // Xoa lop ranh gioi tinh
+        wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_tinh_2025");
+
+        // Cap nhat WMS ranh gioi xa voi CQL filter theo xa
+        await wmsManager.updateWMSLayer(
+            "ws_ranhgioi:rg_vn_xa_2025",
+            `maxa='${communeCode}'`,
+            true,
+        );
+    } else if (filterScope.province_c) {
+        // Quay lai hien tat ca xa cua tinh
+        const cql = `matinh='${filterScope.province_c}'`;
+        await wmsManager.updateWMSLayer("ws_ranhgioi:rg_vn_xa_2025", cql, false);
+
+        // Zoom lai ve tinh
+        await wmsManager.zoomToFilteredExtent(
+            WMS_URL_RANHGIOI,
+            "ws_ranhgioi:rg_vn_tinh_2025",
+            cql,
+        );
+    }
+}
+
+// ========================================
+// POINT MANAGEMENT - QUAN LY DIEM
 // ========================================
 function renderPointList() {
     const container = document.getElementById("pointListContainer");
     const points = pointManager.getAllPoints();
+
     if (points.length === 0) {
         container.innerHTML =
             '<div class="text-muted small text-center py-1">Chua co diem nao</div>';
         return;
     }
-    let html =
-        '<div class="list-group list-group-flush" style="font-size:0.8rem;">';
+
+    let html = '<div class="list-group list-group-flush" style="font-size:0.8rem;">';
     points.forEach(({ pointId, config }) => {
         html += `<div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
                     <span class="text-truncate me-1" style="max-width:120px;" title="${config.name}">${config.name}</span>
@@ -289,7 +206,6 @@ function renderPointList() {
     html += "</div>";
     container.innerHTML = html;
 }
-renderPointList();
 
 function addCustomPoint() {
     const lat = parseFloat(document.getElementById("pointLat").value);
@@ -316,7 +232,6 @@ function addCustomPoint() {
 }
 
 function removeAndRefresh(pointId) {
-    const point = pointManager.getPoint(pointId);
     pointManager.removePoint(pointId);
     renderPointList();
 }
@@ -336,32 +251,8 @@ function clearAllPoints() {
 }
 
 // ========================================
-// SKETCH MANAGER - MODULE 4
+// SKETCH MANAGEMENT - QUAN LY VE
 // ========================================
-const sketchManager = new SketchManager(map, {
-    enableSave: true,
-    enableMerge: true,
-    enableSplit: true,
-    maxElements: 1,
-    apiEndpoint: "/api/polygons/save",
-    redirectAfterSave: false,
-});
-
-sketchManager.initialize();
-
-// ========================================
-// WFS CLICK HANDLER - Che do GetFeatureInfo
-// ========================================
-const wfsClickHandler = (event) => {
-    wmsManager.handleMapClick(event);
-};
-
-// Register handler with sketch manager so it can be disabled/restored
-sketchManager.setWFSClickHandler(wfsClickHandler);
-
-// Initially attach WFS click handler
-map.on("click", wfsClickHandler);
-
 function toggleSketchMode() {
     const isVisible = sketchManager.toggle();
     const btn = document.getElementById("sketch-toggle-btn");
@@ -376,3 +267,46 @@ function toggleSketchMode() {
         btn.innerHTML = '<i class="bi bi-pencil"></i> Bat sketch tools';
     }
 }
+
+const wfsClickHandler = (event) => {
+    wmsManager.handleMapClick(event);
+};
+
+// ========================================
+// EVENT LISTENERS - DANG KY SU KIEN
+// ========================================
+// Filter tinh/xa
+document
+    .getElementById("province_code")
+    .addEventListener("change", async (e) => {
+        await handleProvinceChange(e.target.value);
+    });
+
+document
+    .getElementById("commune_code")
+    .addEventListener("change", async (e) => {
+        await handleCommuneChange(e.target.value);
+    });
+
+// Map click handler for WMS GetFeatureInfo
+map.on("click", wfsClickHandler);
+
+// ========================================
+// INITIALIZATION - KHOI TAO BAN DAU
+// ========================================
+// Initialize WMS Manager
+wmsManager.initializeWMSList(document.getElementById("wmsListContainer"));
+wmsManager.loadDefaultWMSLayers();
+
+// Initialize Sketch Manager
+sketchManager.initialize();
+sketchManager.setWFSClickHandler(wfsClickHandler);
+
+// Initialize Point Manager
+renderPointList();
+
+// Load province list
+loadProvinceList();
+
+// Zoom to default extent
+zoomToDefaultExtent();
