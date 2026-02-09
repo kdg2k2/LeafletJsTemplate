@@ -40,7 +40,7 @@ const loadCommunes = async (
 ) => {
     let res;
 
-    if (!params?.province_code) {
+    if (!params?.province) {
         res = { data: [] };
     } else {
         try {

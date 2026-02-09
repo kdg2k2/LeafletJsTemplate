@@ -44,6 +44,12 @@
                 overflow-y: auto;
             }
 
+            /* Khi #sidebar nằm trong offcanvas, không cần fixed height */
+            #sidebar-offcanvas .panel-scroll {
+                height: auto;
+                overflow-y: visible;
+            }
+
             .card {
                 border-radius: 0.375rem;
             }
@@ -76,9 +82,9 @@
 
     <body class="bg-light">
         <div class="container-fluid mt-2">
-            <div class="row g-2">
-                <!-- Cot 1: Ban do -->
-                <div class="col-lg-8">
+            <div class="row g-2" id="main-row">
+                <!-- Map: col-12 mặc định (full-screen) -->
+                <div class="col-12" id="map-col">
                     <div class="card shadow-sm h-100">
                         <div
                             class="card-header d-flex align-items-center justify-content-between py-1"
@@ -100,8 +106,8 @@
                     </div>
                 </div>
 
-                <!-- Cot 2: Cong cu (sinh dong boi ControlManager) -->
-                <div class="col-lg-4">
+                <!-- Sidebar: ẩn mặc định, hiện khi pin -->
+                <div class="col-lg-4" id="sidebar-col" style="display: none;">
                     <div class="panel-scroll" id="sidebar"></div>
                 </div>
             </div>
@@ -125,13 +131,15 @@
         <script src="assets/js/http-request/fetch.js"></script>
         <script src="assets/js/auto-fill/fill-select.js"></script>
         <script src="assets/js/province-commune-select/events.js"></script>
-        <script src="assets/js/province-commune-select/load-fill.js"></script>
 
         <!-- Coordinate System Support -->
         <script src="assets/js/leaflet/coordinate-utils.js"></script>
 
         <!-- Module 5: ControlManager -->
         <script src="assets/js/leaflet/leaflet-control-manager.js"></script>
+
+        <!-- Module 5.5: Map Controls & Sidebar Layout Manager -->
+        <script src="assets/js/leaflet/leaflet-map-controls.js"></script>
 
         <!-- Map Application Core -->
         <script src="assets/js/leaflet/map-config.js"></script>

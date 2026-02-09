@@ -52,12 +52,29 @@ const DEFAULT_MAP_CONFIG = {
     // Sidebar settings
     sidebar: {
         containerId: "sidebar",
+        mapColId: "map-col",
+        sidebarColId: "sidebar-col",
+        defaultMode: "pinned", // "offcanvas" | "pinned"
         panels: {
             filter: { enabled: true, order: 1 },
             wms: { enabled: true, order: 2 },
             points: { enabled: true, order: 3 },
             sketch: { enabled: true, order: 4 },
         },
+    },
+
+    // Map Controls settings
+    mapControls: {
+        enabled: true,
+        position: "topleft",
+        buttons: [
+            {
+                id: "map-ctrl-tools",
+                icon: "bi-tools",
+                title: "Cong cu",
+                action: "toggleSidebar",
+            },
+        ],
     },
 };
 

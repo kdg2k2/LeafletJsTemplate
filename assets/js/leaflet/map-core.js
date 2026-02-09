@@ -56,6 +56,8 @@ class MapApp {
         this.pointManager = null;
         this.sketchManager = null;
         this.controlManager = null;
+        this.sidebarLayoutManager = null;
+        this._mapControlButtons = null;
 
         // Coordinate converter
         this.coordConverter = new CoordinateConverter();
@@ -84,6 +86,7 @@ class MapApp {
     async init() {
         this._initMap();
         this._initSidebar();
+        this._initMapControls();
         this._initManagers();
         this._attachEventListeners();
         await this._loadInitialData();
@@ -289,6 +292,57 @@ class MapApp {
     }
 
     /**
+     * Initialize map controls (buttons and sidebar layout manager)
+     * @private
+     */
+    _initMapControls() {
+        const controlsConfig = this.config.mapControls;
+        const sidebarConfig = this.config.sidebar;
+
+        // 1. Create SidebarLayoutManager
+        if (sidebarConfig?.mapColId && sidebarConfig?.sidebarColId) {
+            this.sidebarLayoutManager = new SidebarLayoutManager({
+                map: this.map,
+                mapColId: sidebarConfig.mapColId,
+                sidebarColId: sidebarConfig.sidebarColId,
+                sidebarContentId: sidebarConfig.containerId,
+            });
+            this.sidebarLayoutManager.init();
+
+            // Apply default mode
+            if (sidebarConfig.defaultMode === "pinned") {
+                this.sidebarLayoutManager.pin();
+            }
+        }
+
+        // 2. Create map control buttons
+        if (controlsConfig?.enabled !== false && controlsConfig?.buttons) {
+            const btnConfigs = controlsConfig.buttons.map((cfg) => {
+                const config = { ...cfg };
+
+                // Handle special actions
+                if (config.action === "toggleSidebar") {
+                    config.onClick = () => {
+                        if (this.sidebarLayoutManager?.isPinned()) {
+                            this.sidebarLayoutManager.unpin();
+                        } else {
+                            this.sidebarLayoutManager?.openOffcanvas();
+                        }
+                    };
+                }
+
+                return config;
+            });
+
+            this._mapControlButtons = createMapControlButtons(
+                this.map,
+                btnConfigs,
+                { position: controlsConfig.position || "topleft" }
+            );
+        }
+    }
+
+    /**
      * @private
      */
     _initManagers() {
@@ -365,7 +419,7 @@ class MapApp {
         if (typeof loadCommunes === "function") {
             await loadCommunes(
                 this.elementIds.communeSelect,
-                { province_code: provinceCode },
+                { province: provinceCode },
             );
         }
 
@@ -773,6 +827,16 @@ class MapApp {
         if (this.controlManager) {
             this.controlManager.destroy();
             this.controlManager = null;
+        }
+
+        if (this.sidebarLayoutManager) {
+            this.sidebarLayoutManager.destroy();
+            this.sidebarLayoutManager = null;
+        }
+
+        if (this._mapControlButtons && this.map) {
+            this.map.removeControl(this._mapControlButtons);
+            this._mapControlButtons = null;
         }
 
         if (this.map) {
