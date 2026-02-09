@@ -53,6 +53,15 @@ class MapApp {
         this.pointManager = null;
         this.sketchManager = null;
 
+        // Coordinate converter
+        this.coordConverter = new CoordinateConverter();
+
+        // Current coordinate system
+        this.currentCoordSystem = "EPSG:4326"; // Default to WGS84
+
+        // Geolocation watch ID
+        this.geolocationWatchId = null;
+
         // Generate WMS layers
         this.wmsLayers = generateDefaultWMSLayers(this.config.wms.ranhgioiUrl);
 
@@ -108,7 +117,11 @@ class MapApp {
      */
     _initManagers() {
         // WMS Manager
-        this.wmsManager = new WMSLayerManager(this.map, this.wmsLayers);
+        this.wmsManager = new WMSLayerManager(
+            this.map,
+            this.wmsLayers,
+            this.config.wms.ranhgioiLayers
+        );
         if (this.elementIds.wmsListContainer) {
             const container = document.getElementById(
                 this.elementIds.wmsListContainer,
@@ -428,6 +441,129 @@ class MapApp {
     clearAllPoints() {
         this.pointManager.clearAllPoints();
         this.renderPointList();
+    }
+
+    /**
+     * Add point with coordinate system conversion
+     * @param {number} coord1 - X or Longitude
+     * @param {number} coord2 - Y or Latitude
+     * @param {string} name - Point name
+     * @param {string} fromEPSG - Source coordinate system EPSG code
+     * @returns {string|null} Point ID or null if failed
+     */
+    addPointWithCoordSystem(coord1, coord2, name, fromEPSG = "EPSG:4326") {
+        // Convert to WGS84 if needed
+        let lat, lng;
+
+        if (fromEPSG === "EPSG:4326") {
+            lng = coord1;
+            lat = coord2;
+        } else {
+            // Convert from VN2000 to WGS84
+            const converted = this.coordConverter.vn2000ToWGS84(
+                coord1,
+                coord2,
+                fromEPSG,
+            );
+            if (!converted) {
+                console.error("Failed to convert coordinates");
+                return null;
+            }
+            lng = converted.lng;
+            lat = converted.lat;
+        }
+
+        return this.addPoint(lat, lng, name);
+    }
+
+    /**
+     * Get current location and add point
+     * @param {string} name - Point name (optional)
+     * @returns {Promise<string|null>} Point ID or null
+     */
+    async addCurrentLocationPoint(name = null) {
+        try {
+            const position = await GeolocationHelper.getCurrentPosition();
+
+            const pointName =
+                name || `Vi tri hien tai ${new Date().toLocaleTimeString()}`;
+
+            const id = this.addPoint(position.lat, position.lng, pointName);
+
+            if (id) {
+                // Zoom to the point
+                this.zoomToPoint(id, 15);
+
+                // Show notification
+                if (typeof console !== "undefined") {
+                    console.log(
+                        `Added point at: ${position.lat.toFixed(5)}, ${position.lng.toFixed(5)} (accuracy: ${Math.round(position.accuracy)}m)`,
+                    );
+                }
+            }
+
+            return id;
+        } catch (error) {
+            console.error("Geolocation error:", error);
+            alert(`Khong the xac dinh vi tri: ${error.message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Set current coordinate system
+     * @param {string} epsgCode - EPSG code (e.g., "EPSG:4326", "EPSG:5897")
+     */
+    setCoordinateSystem(epsgCode) {
+        this.currentCoordSystem = epsgCode;
+    }
+
+    /**
+     * Get current coordinate system
+     * @returns {string} EPSG code
+     */
+    getCoordinateSystem() {
+        return this.currentCoordSystem;
+    }
+
+    /**
+     * Convert coordinates and update form labels
+     * @param {number} coord1 - First coordinate
+     * @param {number} coord2 - Second coordinate
+     * @param {string} fromEPSG - Source EPSG
+     * @param {string} toEPSG - Target EPSG
+     * @returns {Object|null} {coord1, coord2} or null
+     */
+    convertCoordinates(coord1, coord2, fromEPSG, toEPSG) {
+        const result = this.coordConverter.convert(
+            coord1,
+            coord2,
+            fromEPSG,
+            toEPSG,
+        );
+        if (!result) return null;
+
+        return {
+            coord1: result.x,
+            coord2: result.y,
+        };
+    }
+
+    /**
+     * Get available VN2000 zones
+     * @returns {Array} Array of zone objects
+     */
+    getVN2000Zones() {
+        return this.coordConverter.getVN2000Zones();
+    }
+
+    /**
+     * Suggest best VN2000 zone for current map center
+     * @returns {Object|null} Zone object
+     */
+    suggestVN2000Zone() {
+        const center = this.map.getCenter();
+        return this.coordConverter.suggestVN2000Zone(center.lng, center.lat);
     }
 
     // ========================================

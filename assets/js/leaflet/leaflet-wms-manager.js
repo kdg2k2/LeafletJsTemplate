@@ -8,11 +8,13 @@ class WMSLayerManager {
     /**
      * @param {L.Map} map - Leaflet map instance
      * @param {Array} wmsLayers - Mang cau hinh WMS layers
+     * @param {Array} ranhgioiLayers - Danh sach cac layer ranh gioi (khong thay doi domain khi localhost)
      */
-    constructor(map, wmsLayers = DEFAULT_WMS_LAYERS) {
+    constructor(map, wmsLayers = DEFAULT_WMS_LAYERS, ranhgioiLayers = []) {
         this.map = map;
         this.wmsLayers = new Map(); // Map<configId, L.TileLayer.WMS>
         this.wmsConfigs = [...wmsLayers];
+        this.ranhgioiLayers = ranhgioiLayers; // Store boundary layers list
         this.currentFilters = new Map(); // Map<configId, cqlFilterString>
         this.wfsUtil = new WFSUtil({
             defaultMaxFeatures: 1000,
@@ -29,7 +31,7 @@ class WMSLayerManager {
         const hostname = window.location.hostname;
         if (hostname === "localhost" || hostname === "127.0.0.1") {
             this.wmsConfigs.forEach((config) => {
-                const isBoundaryLayer = WMS_RANHGIOI.some(
+                const isBoundaryLayer = this.ranhgioiLayers.some(
                     (rg) => config.layer === rg,
                 );
                 if (!isBoundaryLayer) {

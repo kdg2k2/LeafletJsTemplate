@@ -194,27 +194,66 @@
                                         id="pointListContainer"
                                         class="mb-2"
                                     ></div>
+
+                                    <!-- He toa do -->
+                                    <div class="mb-2">
+                                        <label
+                                            class="form-label small fw-semibold mb-1"
+                                        >
+                                            He toa do
+                                        </label>
+                                        <select
+                                            class="form-select form-select-sm"
+                                            id="pointCoordSystem"
+                                        >
+                                            <option value="EPSG:4326">
+                                                WGS84 (Kinh/Vi do)
+                                            </option>
+                                            <!-- Options will be populated by JavaScript -->
+                                        </select>
+                                    </div>
+
+                                    <!-- Toa do -->
                                     <div class="row g-1 mb-2">
                                         <div class="col-6">
+                                            <label
+                                                class="form-label small fw-semibold mb-1"
+                                                id="pointCoord1Label"
+                                            >
+                                                Kinh do (Lng)
+                                            </label>
                                             <input
                                                 type="number"
                                                 step="any"
                                                 class="form-control form-control-sm"
-                                                id="pointLat"
-                                                placeholder="Vi do"
+                                                id="pointCoord1"
+                                                placeholder="VD: 105.8542"
                                             />
                                         </div>
                                         <div class="col-6">
+                                            <label
+                                                class="form-label small fw-semibold mb-1"
+                                                id="pointCoord2Label"
+                                            >
+                                                Vi do (Lat)
+                                            </label>
                                             <input
                                                 type="number"
                                                 step="any"
                                                 class="form-control form-control-sm"
-                                                id="pointLng"
-                                                placeholder="Kinh do"
+                                                id="pointCoord2"
+                                                placeholder="VD: 21.0285"
                                             />
                                         </div>
                                     </div>
+
+                                    <!-- Ten diem -->
                                     <div class="mb-2">
+                                        <label
+                                            class="form-label small fw-semibold mb-1"
+                                        >
+                                            Ten diem
+                                        </label>
                                         <input
                                             type="text"
                                             class="form-control form-control-sm"
@@ -222,7 +261,17 @@
                                             placeholder="Ten diem"
                                         />
                                     </div>
+
+                                    <!-- Buttons -->
                                     <div class="d-grid gap-1">
+                                        <button
+                                            class="btn btn-success btn-sm"
+                                            id="currentLocationBtn"
+                                            onclick="addCurrentLocationPoint()"
+                                        >
+                                            <i class="bi bi-geo-alt-fill"></i>
+                                            Vi tri hien tai
+                                        </button>
                                         <button
                                             class="btn btn-danger btn-sm"
                                             onclick="addCustomPoint()"
@@ -300,6 +349,10 @@
         <script src="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
 
+        <!-- Coordinate System Support -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+        <script src="assets/data/vn2000.js"></script>
+
         <!-- Module 1: WFSUtil -->
         <script src="assets/js/leaflet/leaflet-wfs-util.js"></script>
         <!-- Module 2: WMSLayerManager -->
@@ -315,8 +368,9 @@
         <script src="assets/js/province-commune-select/load-fill.js"></script>
 
         <!-- Map Application Core -->
-        <script src="assets/js/map-config.js"></script>
-        <script src="assets/js/map-core.js"></script>
-        <script src="assets/js/index.js"></script>
+        <script src="assets/js/leaflet/map-config.js"></script>
+        <script src="assets/js/leaflet/map-core.js"></script>
+        <script src="assets/js/leaflet/coordinate-utils.js"></script>
+        <script src="assets/js/leaflet/index.js"></script>
     </body>
 </html>
