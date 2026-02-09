@@ -67,8 +67,11 @@ class MapApp {
         this.currentCoordSystem = "WGS84";
         this.geolocationWatchId = null;
 
-        // Generate WMS layers
-        this.wmsLayers = generateDefaultWMSLayers(this.config.wms.ranhgioiUrl);
+        // Generate WMS layers (default + custom)
+        const defaultWMSLayers = generateDefaultWMSLayers(this.config.wms.ranhgioiUrl);
+        const customWMSLayers = this.config.wmsLayers || [];
+        this.wmsLayers = [...defaultWMSLayers, ...customWMSLayers];
+
 
         this._bindMethods();
     }

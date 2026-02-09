@@ -28,22 +28,22 @@ class WMSLayerManager {
      * Thay doi URL cua WMS layers neu dang chay tren localhost
      */
     replaceDomainIfIsLocalhost() {
-        const hostname = window.location.hostname;
-        if (hostname === "localhost" || hostname === "127.0.0.1") {
-            this.wmsConfigs.forEach((config) => {
-                const isBoundaryLayer = this.ranhgioiLayers.some(
-                    (rg) => config.layer === rg,
-                );
-                if (!isBoundaryLayer) {
-                    try {
-                        const urlObj = new URL(config.url);
-                        config.url = `http://localhost:8080${urlObj.pathname}`;
-                    } catch (e) {
-                        // URL khong hop le, bo qua
-                    }
-                }
-            });
-        }
+        // const hostname = window.location.hostname;
+        // if (hostname === "localhost" || hostname === "127.0.0.1") {
+        //     this.wmsConfigs.forEach((config) => {
+        //         const isBoundaryLayer = this.ranhgioiLayers.some(
+        //             (rg) => config.layer === rg,
+        //         );
+        //         if (!isBoundaryLayer) {
+        //             try {
+        //                 const urlObj = new URL(config.url);
+        //                 config.url = `http://localhost:8080${urlObj.pathname}`;
+        //             } catch (e) {
+        //                 // URL khong hop le, bo qua
+        //             }
+        //         }
+        //     });
+        // }
     }
 
     /**
@@ -173,7 +173,10 @@ class WMSLayerManager {
     async toggleWMSLayer(wmsId, button = null) {
         const isVisible = this.wmsLayers.has(wmsId);
         const config = this.wmsConfigs.find((c) => c.id === wmsId);
-        if (!config) return;
+        if (!config) {
+            console.error(`toggleWMSLayer: Config not found for wmsId="${wmsId}"`);
+            return;
+        }
 
         if (button) {
             const icon = button.querySelector("i");

@@ -9,7 +9,22 @@
 
 // Create map instance - element IDs sinh dong tu containerId "map"
 const mapApp = new MapApp("map", {
-    config: DEFAULT_MAP_CONFIG,
+    config: {
+        ...DEFAULT_MAP_CONFIG,
+        // Custom WMS layers specific to this instance
+        wmsLayers: [
+            {
+                id: uniqid("wms_id_", true),
+                name: "F4_DBR_2024:hanoi",
+                url: "https://wms.tanmaixanh.vn:8453/geoserver/F4_DBR_2024/wms",
+                layer: "F4_DBR_2024:hanoi",
+                version: "1.1.1",
+                defaultVisible: false,
+                zoomPriority: 8,
+                zIndex: 2,
+            },
+        ],
+    },
 });
 
 // Initialize the map
