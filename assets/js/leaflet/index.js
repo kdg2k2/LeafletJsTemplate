@@ -25,6 +25,33 @@ const mapApp = new MapApp("map", {
             },
         ],
     },
+    // Custom handler for province change - update CQL filters for custom WMS layers
+    onProvinceChange: async ({ filterScope, wmsManager, provinceCode }) => {
+        // Example: Filter custom WMS layer by province
+        // You can build CQL filter based on your layer's attribute names
+        if (provinceCode) {
+            // If layer has province attribute, apply filter
+            // await wmsManager.updateWMSLayer("F4_DBR_2024:hanoi", `province_code='${provinceCode}'`, false);
+            console.log(`Province changed to: ${provinceCode}`);
+        } else {
+            // Reset filter when no province selected
+            // await wmsManager.removeWmsLayerByNameLayer("F4_DBR_2024:hanoi");
+            console.log('Province filter cleared');
+        }
+    },
+    // Custom handler for commune change - update CQL filters for custom WMS layers
+    onCommuneChange: async ({ filterScope, wmsManager, communeCode }) => {
+        // Example: Filter custom WMS layer by commune
+        if (communeCode) {
+            // If layer has commune attribute, apply filter
+            // await wmsManager.updateWMSLayer("F4_DBR_2024:hanoi", `commune_code='${communeCode}'`, false);
+            console.log(`Commune changed to: ${communeCode}`);
+        } else if (filterScope.province_c) {
+            // When commune cleared but province selected, revert to province filter
+            // await wmsManager.updateWMSLayer("F4_DBR_2024:hanoi", `province_code='${filterScope.province_c}'`, false);
+            console.log(`Commune cleared, reverting to province: ${filterScope.province_c}`);
+        }
+    },
 });
 
 // Initialize the map

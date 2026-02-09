@@ -26,6 +26,10 @@ class MapApp {
         this.containerId = mapContainerId;
         this.config = options.config || DEFAULT_MAP_CONFIG;
 
+        // Custom callbacks for province/commune change events
+        this.onProvinceChange = options.onProvinceChange || null;
+        this.onCommuneChange = options.onCommuneChange || null;
+
         // Auto-generate element IDs tu containerId
         const id = mapContainerId;
         this.elementIds = {
@@ -625,6 +629,15 @@ class MapApp {
                 "ws_ranhgioi:rg_vn_xa_2025",
             );
         }
+
+        // Call custom handler if provided
+        if (this.onProvinceChange) {
+            await this.onProvinceChange({
+                filterScope: this.filterScope,
+                wmsManager: this.wmsManager,
+                provinceCode: provinceCode
+            });
+        }
     }
 
     async handleCommuneChange(e) {
@@ -654,6 +667,15 @@ class MapApp {
                 "ws_ranhgioi:rg_vn_tinh_2025",
                 cql,
             );
+        }
+
+        // Call custom handler if provided
+        if (this.onCommuneChange) {
+            await this.onCommuneChange({
+                filterScope: this.filterScope,
+                wmsManager: this.wmsManager,
+                communeCode: communeCode
+            });
         }
     }
 
