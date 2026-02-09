@@ -355,7 +355,10 @@ class MapApp {
         this._getLayoutParent().appendChild(offcanvas);
 
         // Initialize Bootstrap offcanvas
-        this.basemapOffcanvas = new bootstrap.Offcanvas(offcanvas);
+        this.basemapOffcanvas = new bootstrap.Offcanvas(offcanvas, {
+            backdrop: false,  // No backdrop - allow map interaction
+            scroll: true      // Allow scrolling body (map) while offcanvas open
+        });
 
         // Add event listeners for radio buttons
         offcanvas.querySelectorAll('input[name="basemap-radio"]').forEach(radio => {
@@ -373,6 +376,22 @@ class MapApp {
     _getLayoutParent() {
         const mapDiv = document.getElementById(this.containerId);
         return mapDiv.closest('.container-fluid') || mapDiv.parentElement;
+    }
+
+    /**
+     * Close all open offcanvas elements
+     * Used before opening a new offcanvas to prevent overlay
+     * @private
+     */
+    _closeAllOffcanvas() {
+        // Close basemap offcanvas
+        if (this.basemapOffcanvas) {
+            this.basemapOffcanvas.hide();
+        }
+        // Close sidebar offcanvas (if not pinned)
+        if (this.sidebarLayoutManager && !this.sidebarLayoutManager.isPinned()) {
+            this.sidebarLayoutManager.closeOffcanvas();
+        }
     }
 
     /**
@@ -431,6 +450,8 @@ class MapApp {
                         if (this.sidebarLayoutManager?.isPinned()) {
                             this.sidebarLayoutManager.unpin();
                         } else {
+                            // Close other offcanvas before opening sidebar
+                            this._closeAllOffcanvas();
                             this.sidebarLayoutManager?.openOffcanvas();
                         }
                     };
@@ -438,6 +459,11 @@ class MapApp {
                 // Handle toggleBasemap action
                 else if (config.action === "toggleBasemap") {
                     config.onClick = () => {
+                        // Close other offcanvas before opening basemap selector
+                        if (this.sidebarLayoutManager && !this.sidebarLayoutManager.isPinned()) {
+                            this.sidebarLayoutManager.closeOffcanvas();
+                        }
+
                         if (this.basemapOffcanvas) {
                             this.basemapOffcanvas.toggle();
                         }

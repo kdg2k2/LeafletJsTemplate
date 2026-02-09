@@ -214,7 +214,10 @@ class SidebarLayoutManager {
         this.originalMapParent.appendChild(offcanvas);
 
         this.offcanvasElement = offcanvas;
-        this.bsOffcanvas = new bootstrap.Offcanvas(offcanvas);
+        this.bsOffcanvas = new bootstrap.Offcanvas(offcanvas, {
+            backdrop: false,  // No backdrop - allow map interaction
+            scroll: true      // Allow scrolling body (map) while offcanvas open
+        });
 
         // Track for cleanup
         this.createdElements.push(offcanvas);
