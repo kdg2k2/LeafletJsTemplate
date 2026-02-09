@@ -208,7 +208,10 @@ class SidebarLayoutManager {
 
         offcanvas.appendChild(header);
         offcanvas.appendChild(body);
-        document.body.appendChild(offcanvas);
+
+        // Append into layout parent (not document.body)
+        // so offcanvas works inside fullscreen context
+        this.originalMapParent.appendChild(offcanvas);
 
         this.offcanvasElement = offcanvas;
         this.bsOffcanvas = new bootstrap.Offcanvas(offcanvas);

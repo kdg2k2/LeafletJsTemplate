@@ -332,7 +332,9 @@ class MapApp {
             </div>
         `;
 
-        document.body.appendChild(offcanvas);
+        // Append into layout parent (not document.body)
+        // so offcanvas works inside fullscreen context
+        this._getLayoutParent().appendChild(offcanvas);
 
         // Initialize Bootstrap offcanvas
         this.basemapOffcanvas = new bootstrap.Offcanvas(offcanvas);
@@ -343,6 +345,16 @@ class MapApp {
                 this.switchBasemap(e.target.value);
             });
         });
+    }
+
+    /**
+     * Get the layout parent element (container-fluid or closest wrapper)
+     * Used as fullscreen target and offcanvas container
+     * @returns {HTMLElement}
+     */
+    _getLayoutParent() {
+        const mapDiv = document.getElementById(this.containerId);
+        return mapDiv.closest('.container-fluid') || mapDiv.parentElement;
     }
 
     /**
@@ -429,9 +441,10 @@ class MapApp {
                 // Handle toggleFullscreen action
                 else if (config.action === "toggleFullscreen") {
                     config.onClick = () => {
-                        const mapContainer = this.map.getContainer();
+                        // Fullscreen the layout parent (contains map + sidebar + offcanvas)
+                        const fullscreenTarget = this._getLayoutParent();
                         if (!document.fullscreenElement) {
-                            mapContainer.requestFullscreen().catch(err => {
+                            fullscreenTarget.requestFullscreen().catch(err => {
                                 console.error("Fullscreen error:", err);
                             });
                         } else {
