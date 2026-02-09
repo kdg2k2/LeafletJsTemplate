@@ -59,6 +59,34 @@ function uniqid(prefix = "", moreEntropy = false) {
     return `${prefix}${id}${moreEntropy ? "." + Math.trunc(Math.random() * 100000000) : ""}`;
 }
 
+function toFixedLengthNumberString(value, length, options = {}) {
+    const {
+        padChar = "0",
+        truncate = false,
+        truncateFrom = "left",
+        keepSign = true,
+    } = options;
+
+    let num = String(value);
+    let sign = "";
+
+    if (keepSign && num.startsWith("-")) {
+        sign = "-";
+        num = num.slice(1);
+    }
+
+    if (truncate && num.length > length) {
+        num =
+            truncateFrom === "right"
+                ? num.slice(0, length)
+                : num.slice(-length);
+    }
+
+    num = num.padStart(length, padChar);
+
+    return sign + num;
+}
+
 /**
  * Generate default WMS layers configuration
  */

@@ -207,7 +207,7 @@ class MapApp {
      * @param {Event} e - Change event
      */
     async handleProvinceChange(e) {
-        const provinceCode = e.target.value;
+        const provinceCode = toFixedLengthNumberString(e.target.value, 2);
 
         // Update filter scope
         this.filterScope.province_c = provinceCode || null;
@@ -253,7 +253,7 @@ class MapApp {
      * @param {Event} e - Change event
      */
     async handleCommuneChange(e) {
-        const communeCode = e.target.value;
+        const communeCode = toFixedLengthNumberString(e.target.value, 5);
 
         // Update filter scope
         this.filterScope.commune_c = communeCode || null;
