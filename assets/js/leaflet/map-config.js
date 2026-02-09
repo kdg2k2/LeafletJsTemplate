@@ -48,6 +48,17 @@ const DEFAULT_MAP_CONFIG = {
         apiEndpoint: "/api/polygons/save",
         redirectAfterSave: false,
     },
+
+    // Sidebar settings
+    sidebar: {
+        containerId: "sidebar",
+        panels: {
+            filter: { enabled: true, order: 1 },
+            wms: { enabled: true, order: 2 },
+            points: { enabled: true, order: 3 },
+            sketch: { enabled: true, order: 4 },
+        },
+    },
 };
 
 /**
