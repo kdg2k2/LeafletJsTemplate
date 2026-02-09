@@ -287,10 +287,13 @@ class WMSLayerManager {
         );
 
         // Hien popup loading
-        const loadingPopup = L.popup()
+        const loadingPopup = L.popup({
+            className: "wms-feature-popup",
+            maxWidth: 360,
+        })
             .setLatLng(latlng)
             .setContent(
-                '<div class="text-center p-2"><div class="spinner-border spinner-border-sm" role="status"></div> <small>Dang tai...</small></div>',
+                '<div style="padding:16px;text-align:center;"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> <span style="font-size:12px;color:#666;margin-left:6px;">Dang tai...</span></div>',
             )
             .openOn(this.map);
 
@@ -314,12 +317,12 @@ class WMSLayerManager {
                 this.displayFeatureInfo(validResult, latlng);
             } else {
                 loadingPopup.setContent(
-                    '<div class="text-center p-2"><small class="text-muted">Khong tim thay thong tin</small></div>',
+                    '<div style="padding:14px;text-align:center;font-size:12px;color:#999;"><i class="bi bi-info-circle" style="margin-right:4px;"></i>Khong tim thay thong tin</div>',
                 );
             }
         } catch (error) {
             loadingPopup.setContent(
-                `<div class="text-center p-2"><small class="text-danger">Loi: ${error.message}</small></div>`,
+                `<div style="padding:14px;text-align:center;font-size:12px;color:#e53935;"><i class="bi bi-exclamation-triangle" style="margin-right:4px;"></i>Loi: ${error.message}</div>`,
             );
         }
     }
@@ -440,7 +443,11 @@ class WMSLayerManager {
      */
     displayFeatureInfo(result, latlng) {
         const content = this.createPopupContent(result);
-        L.popup({ maxWidth: 350, maxHeight: 300 })
+        L.popup({
+            maxWidth: 360,
+            maxHeight: 350,
+            className: "wms-feature-popup",
+        })
             .setLatLng(latlng)
             .setContent(content)
             .openOn(this.map);
@@ -453,30 +460,59 @@ class WMSLayerManager {
      */
     createPopupContent(result) {
         if (!result || !result.data || result.data.length === 0) {
-            return '<div class="p-2"><small>Khong co du lieu</small></div>';
+            return '<div style="padding:12px;text-align:center;color:#999;font-size:12px;">Khong co du lieu</div>';
         }
 
         const feature = result.data[0];
         const props = feature.properties || {};
-
-        let html = '<div class="p-1" style="font-size:12px;">';
-        html += `<div class="fw-bold mb-1 border-bottom pb-1">${result.layerInfo?.name || result.layerName}</div>`;
-        html +=
-            '<table class="table table-sm table-borderless mb-0" style="font-size:11px;">';
+        const layerName = result.layerInfo?.name || result.layerName;
 
         const skipKeys = ["bbox", "geometry", "the_geom", "geom", "shape"];
+        const entries = Object.entries(props).filter(
+            ([key, value]) =>
+                !skipKeys.includes(key.toLowerCase()) &&
+                value !== null &&
+                value !== undefined,
+        );
 
-        Object.entries(props).forEach(([key, value]) => {
-            if (skipKeys.includes(key.toLowerCase())) return;
-            if (value === null || value === undefined) return;
+        let html = '<div style="min-width:240px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">';
 
-            const label = this.getPropertyLabel(key);
-            const formattedValue = this.getFieldFormat(key, value);
+        // Header
+        html += '<div style="background:linear-gradient(135deg,#1565c0,#42a5f5);color:#fff;padding:8px 12px;">';
+        html += `<div style="font-size:13px;font-weight:600;"><i class="bi bi-layers-fill" style="margin-right:5px;opacity:0.8;"></i>${layerName}</div>`;
+        if (entries.length > 0) {
+            html += `<div style="font-size:10px;opacity:0.7;margin-top:2px;">${entries.length} thuoc tinh</div>`;
+        }
+        html += "</div>";
 
-            html += `<tr><td class="text-muted pe-2" style="white-space:nowrap;">${label}</td><td class="fw-semibold">${formattedValue}</td></tr>`;
-        });
+        // Body
+        if (entries.length === 0) {
+            html += '<div style="padding:14px;text-align:center;color:#999;font-size:12px;">Khong co thuoc tinh</div>';
+        } else {
+            html += '<div style="padding:4px 0;">';
+            entries.forEach(([key, value], index) => {
+                const label = this.getPropertyLabel(key);
+                const formattedValue = this.getFieldFormat(key, value);
+                const bg = index % 2 === 0 ? "#f5f7fa" : "#fff";
 
-        html += "</table></div>";
+                html += `<div style="display:flex;padding:5px 10px;background:${bg};gap:8px;align-items:baseline;">`;
+                html += `<div style="flex:0 0 auto;min-width:85px;font-size:11px;color:#78909c;font-weight:500;">${label}</div>`;
+                html += `<div style="flex:1;font-size:12px;font-weight:600;color:#263238;word-break:break-word;">${formattedValue}</div>`;
+                html += "</div>";
+            });
+            html += "</div>";
+        }
+
+        // Footer - toa do
+        if (result.clickPoint) {
+            const lat = result.clickPoint.lat.toFixed(6);
+            const lng = result.clickPoint.lng.toFixed(6);
+            html += `<div style="border-top:1px solid #e0e0e0;padding:5px 10px;font-size:10px;color:#90a4ae;text-align:right;">`;
+            html += `<i class="bi bi-geo-alt" style="margin-right:3px;"></i>${lat}, ${lng}`;
+            html += "</div>";
+        }
+
+        html += "</div>";
         return html;
     }
 

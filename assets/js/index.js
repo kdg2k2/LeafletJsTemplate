@@ -46,15 +46,35 @@ const DEFAULT_WMS_LAYERS = [
 // ========================================
 // KHOI TAO BAN DO
 // ========================================
-const basemapHybrid = L.tileLayer(
-    "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-    { maxZoom: 20, attribution: "" },
-);
+const MAP_CENTER = null; // null = tu dong lay tu WMS defaultVisible, hoac [lat, lng]
+const MAP_ZOOM = 6;
+
+function zoomToDefaultExtent() {
+    if (MAP_CENTER) {
+        map.flyTo(MAP_CENTER, MAP_ZOOM, { duration: 0.5 });
+    } else {
+        const config = DEFAULT_WMS_LAYERS.find((c) => c.defaultVisible);
+        if (config) {
+            wmsManager.zoomToFilteredExtent(config.url, config.layer, null);
+        }
+    }
+}
 
 const map = L.map("map", {
-    center: [21.0245, 105.85],
-    zoom: 6,
-    layers: [basemapHybrid],
+    center: MAP_CENTER || [0, 0],
+    zoom: MAP_CENTER ? MAP_ZOOM : 2,
+    layers: [
+        L.tileLayer(
+            "https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.{ext}",
+            {
+                minZoom: 0,
+                maxZoom: 20,
+                attribution:
+                    '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                ext: "png",
+            },
+        ),
+    ],
 });
 
 // ========================================
@@ -70,6 +90,9 @@ const pointManager = new PointManager(map, {
 // Render WMS list + load mac dinh
 wmsManager.initializeWMSList(document.getElementById("wmsListContainer"));
 wmsManager.loadDefaultWMSLayers();
+
+// Auto zoom toi extent mac dinh
+zoomToDefaultExtent();
 
 // ========================================
 // LOC TINH / XA -> CQL FILTER -> WMS
@@ -187,7 +210,8 @@ function resetFilter() {
     );
     if (xaConfig) wmsManager.removeWMSLayer(xaConfig.id);
 
-    map.flyTo([21.0245, 105.85], 6, { duration: 0.5 });
+    // Zoom lai ve extent mac dinh
+    zoomToDefaultExtent();
 }
 
 // Load danh sach tinh khi trang tai xong
@@ -334,6 +358,7 @@ const sketchManager = new SketchManager(map, {
     enableSave: true,
     enableMerge: true,
     enableSplit: true,
+    maxElements: 1,
     apiEndpoint: "/api/polygons/save",
     redirectAfterSave: false,
 });

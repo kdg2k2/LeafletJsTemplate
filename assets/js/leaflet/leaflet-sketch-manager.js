@@ -13,6 +13,7 @@ class SketchManager {
             enableSave: true,
             enableMerge: true,
             enableSplit: true,
+            maxElements: 0, // 0 = khong gioi han, > 0 = gioi han so polygon
             apiEndpoint: "/api/polygons/save",
             redirectAfterSave: false,
             redirectUrl: null,
@@ -211,9 +212,22 @@ class SketchManager {
         this.map.on("pm:create", (e) => {
             if (!this.isVisible || !e.layer) return;
 
+            // Khi dang o che do split, bo qua -> de handler cua enterSplitMode xu ly
+            if (this.isSplitMode) return;
+
             if (window.filterScope) {
                 filterScope.tt = null;
                 delete filterScope.id;
+            }
+
+            // Kiem tra maxElements: neu vuot qua gioi han -> xoa het truoc khi them moi
+            if (this.options.maxElements > 0) {
+                const currentCount = this.sketchLayerGroup.getLayers().length;
+                if (currentCount >= this.options.maxElements) {
+                    this.sketchLayerGroup.clearLayers();
+                    this.selectedLayers.clear();
+                    this.measurementLayerGroup.clearLayers();
+                }
             }
 
             e.layer.setStyle(this.fillStyle);
@@ -879,14 +893,45 @@ class SketchManager {
     }
 
     async handleSave() {
-        const saveable = this.getSaveablePolygons();
-        if (saveable.length === 0) {
-            alert("Không có polygon để lưu");
-            return;
+        // Khi co maxElements: chi save cac layer dang duoc chon
+        let toSave;
+        if (this.options.maxElements > 0) {
+            if (this.selectedLayers.size === 0) {
+                // Neu chua chon va chi co duy nhat 1 layer -> tu dong chon no
+                const allLayers = this.sketchLayerGroup.getLayers();
+                const saveableAll = allLayers.filter((l) => this.canPolygonBeSaved(l));
+                if (saveableAll.length === 1) {
+                    toSave = saveableAll;
+                } else if (saveableAll.length > 1) {
+                    alert(`Có ${saveableAll.length} hình trên bản đồ. Hãy chọn tối đa ${this.options.maxElements} hình để lưu.`);
+                    return;
+                } else {
+                    alert("Không có polygon để lưu");
+                    return;
+                }
+            } else {
+                // Chi lay cac layer da chon va co the save
+                toSave = Array.from(this.selectedLayers).filter((l) => this.canPolygonBeSaved(l));
+                if (toSave.length === 0) {
+                    alert("Các hình đã chọn không thể lưu (đã lưu rồi hoặc không hợp lệ)");
+                    return;
+                }
+                if (toSave.length > this.options.maxElements) {
+                    alert(`Chỉ cho phép lưu tối đa ${this.options.maxElements} hình mỗi lần. Đang chọn ${toSave.length} hình.`);
+                    return;
+                }
+            }
+        } else {
+            // Khong gioi han -> save tat ca
+            toSave = this.getSaveablePolygons();
+            if (toSave.length === 0) {
+                alert("Không có polygon để lưu");
+                return;
+            }
         }
 
         try {
-            const polygonData = saveable.map((layer) => this.layerToWKT(layer));
+            const polygonData = toSave.map((layer) => this.layerToWKT(layer));
 
             if (!window.filterScope) {
                 alert("filterScope không được định nghĩa");
@@ -909,7 +954,7 @@ class SketchManager {
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-            saveable.forEach((layer) => this.markPolygonAsSaved(layer));
+            toSave.forEach((layer) => this.markPolygonAsSaved(layer));
             this.isDirty = false;
 
             alert("Lưu thành công!");
