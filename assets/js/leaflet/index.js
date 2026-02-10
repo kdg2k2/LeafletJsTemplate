@@ -39,6 +39,21 @@ const mapApp = new MapApp("map", {
     onCommuneChange: async ({ communeCode }) => {
         console.log(`Commune changed to: ${communeCode || 'none'}`);
     },
+    // Custom sidebar panels - add extra menu sections to sidebar
+    sidebarPanels: [
+        {
+            id: "custom-info",
+            title: "Thong tin bo sung",
+            icon: "bi-info-circle-fill",
+            iconColor: "text-info",
+            collapsible: true,
+            collapsed: true,
+            order: 5, // After sketch panel (order 4)
+            render: (body) => {
+                body.innerHTML = `<p class="small text-muted mb-0">Noi dung tuy chinh...</p>`;
+            },
+        },
+    ],
 });
 
 // Initialize the map

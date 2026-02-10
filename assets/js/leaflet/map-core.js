@@ -30,6 +30,9 @@ class MapApp {
         this.onProvinceChange = options.onProvinceChange || null;
         this.onCommuneChange = options.onCommuneChange || null;
 
+        // Custom sidebar panels
+        this.customSidebarPanels = options.sidebarPanels || [];
+
         // Auto-generate element IDs tu containerId
         const id = mapContainerId;
         this.elementIds = {
@@ -211,6 +214,11 @@ class MapApp {
                 render: (body) => this._renderSketchPanel(body),
             });
         }
+
+        // Register custom sidebar panels from options.sidebarPanels
+        this.customSidebarPanels.forEach(panel => {
+            this.controlManager.registerPanel(panel);
+        });
 
         this.controlManager.render();
     }
