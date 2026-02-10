@@ -589,6 +589,39 @@ class MapApp {
     // FILTER MANAGEMENT
     // ========================================
 
+    /**
+     * Auto-filter custom WMS layers based on current filterScope.
+     * Layers with filterConfig will be filtered by province/commune automatically.
+     * Filter is stored so toggling layers on/off preserves the filter state.
+     */
+    async filterCustomWMSLayers() {
+        const customLayers = this.config.wmsLayers || [];
+
+        for (const layerConfig of customLayers) {
+            if (!layerConfig.filterConfig) continue;
+
+            const { provinceField, communeField } = layerConfig.filterConfig;
+            const { province_c, commune_c } = this.filterScope;
+
+            let cqlFilter = null;
+
+            if (commune_c && communeField) {
+                cqlFilter = `${communeField}='${commune_c}'`;
+            } else if (province_c && provinceField) {
+                cqlFilter = `${provinceField}='${province_c}'`;
+            }
+
+            // Always store the filter (used when layer is toggled on later)
+            this.wmsManager.currentFilters.set(layerConfig.id, cqlFilter);
+
+            // If layer is currently visible, update it with new filter
+            const isVisible = this.wmsManager.wmsLayers.has(layerConfig.id);
+            if (isVisible) {
+                await this.wmsManager.updateWMSLayer(layerConfig.layer, cqlFilter, false);
+            }
+        }
+    }
+
     async handleProvinceChange(e) {
         const provinceCode = toFixedLengthNumberString(e.target.value, 2);
 
@@ -630,6 +663,9 @@ class MapApp {
             );
         }
 
+        // Auto-filter custom WMS layers by province/commune
+        await this.filterCustomWMSLayers();
+
         // Call custom handler if provided
         if (this.onProvinceChange) {
             await this.onProvinceChange({
@@ -668,6 +704,9 @@ class MapApp {
                 cql,
             );
         }
+
+        // Auto-filter custom WMS layers by province/commune
+        await this.filterCustomWMSLayers();
 
         // Call custom handler if provided
         if (this.onCommuneChange) {
@@ -709,6 +748,9 @@ class MapApp {
             false,
         );
         this.wmsManager.removeWmsLayerByNameLayer("ws_ranhgioi:rg_vn_xa_2025");
+
+        // Reset filters on custom WMS layers (filterScope is null so filters are cleared)
+        this.filterCustomWMSLayers();
 
         this.zoomToDefaultExtent();
     }

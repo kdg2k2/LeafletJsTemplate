@@ -107,7 +107,7 @@ const DEFAULT_MAP_CONFIG = {
     // Sidebar settings
     sidebar: {
         containerId: "sidebar",
-        defaultMode: "offcanvas", // "offcanvas" | "pinned"
+        defaultMode: "pinned", // "offcanvas" | "pinned"
         panels: {
             filter: { enabled: true, order: 1 },
             wms: { enabled: true, order: 2 },
