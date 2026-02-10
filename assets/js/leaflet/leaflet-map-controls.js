@@ -143,6 +143,8 @@ class SidebarLayoutManager {
         // Create panel-scroll wrapper inside sidebar column
         const panelScroll = document.createElement("div");
         panelScroll.className = "panel-scroll";
+        panelScroll.style.height = "98vh";
+        panelScroll.style.overflowY = "auto";
         sidebarCol.appendChild(panelScroll);
 
         // Assemble structure
@@ -206,8 +208,13 @@ class SidebarLayoutManager {
         body.className = "offcanvas-body p-2";
         body.id = `${this.offcanvasId}-body`;
 
+        // Override panel-scroll height inside offcanvas (scoped to dynamic ID)
+        const scopedStyle = document.createElement("style");
+        scopedStyle.textContent = `#${this.offcanvasId} .panel-scroll { height: auto; overflow-y: visible; }`;
+
         offcanvas.appendChild(header);
         offcanvas.appendChild(body);
+        offcanvas.appendChild(scopedStyle);
 
         // Append into layout parent (not document.body)
         // so offcanvas works inside fullscreen context
