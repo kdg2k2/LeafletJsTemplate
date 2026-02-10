@@ -116,6 +116,10 @@ class SidebarLayoutManager {
         mapCol.id = this.mapColId;
         mapCol.className = "col-12"; // Fullscreen by default
 
+        // Capture map height before detaching from DOM
+        const mapElement = mapDiv.closest(".card") || mapDiv;
+        const mapHeight = mapElement.offsetHeight;
+
         // Wrap the map card if it exists, or create one
         const mapCard = mapDiv.closest(".card");
         if (mapCard) {
@@ -143,7 +147,7 @@ class SidebarLayoutManager {
         // Create panel-scroll wrapper inside sidebar column
         const panelScroll = document.createElement("div");
         panelScroll.className = "panel-scroll";
-        panelScroll.style.height = "98vh";
+        panelScroll.style.height = mapHeight + "px";
         panelScroll.style.overflowY = "auto";
         sidebarCol.appendChild(panelScroll);
 
