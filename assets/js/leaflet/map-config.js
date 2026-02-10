@@ -16,7 +16,7 @@ const DEFAULT_MAP_CONFIG = {
 
     // Tile layer settings (default basemap)
     tileLayer: {
-        url: "http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}",
+        url: "http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         options: {
             maxZoom: 20,
             subdomains: ["mt0", "mt1", "mt2", "mt3"],
@@ -25,12 +25,12 @@ const DEFAULT_MAP_CONFIG = {
 
     // Basemap options
     basemaps: {
-        default: "googleSatellite", // ID của basemap mặc định
+        default: "googleHybrid", // ID của basemap mặc định
         options: [
             {
                 id: "googleSatellite",
                 name: "Google Satellite",
-                url: "http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}",
+                url: "http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
                 options: {
                     maxZoom: 20,
                     subdomains: ["mt0", "mt1", "mt2", "mt3"],

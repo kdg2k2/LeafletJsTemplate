@@ -137,7 +137,7 @@ class SidebarLayoutManager {
         // Create sidebar column (hidden by default)
         const sidebarCol = document.createElement("div");
         sidebarCol.id = this.sidebarColId;
-        sidebarCol.className = "col-lg-4";
+        sidebarCol.className = "col-lg-3";
         sidebarCol.style.display = "none";
 
         // Create panel-scroll wrapper inside sidebar column
@@ -337,8 +337,8 @@ class SidebarLayoutManager {
             );
         }
 
-        mapCol.className = "col-lg-8";
-        sidebarCol.className = "col-lg-4";
+        mapCol.className = "col-lg-9";
+        sidebarCol.className = "col-lg-3";
         sidebarCol.style.display = "";
 
         this.isPinnedState = true;

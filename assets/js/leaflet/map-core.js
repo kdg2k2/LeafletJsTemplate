@@ -326,7 +326,27 @@ class MapApp {
     }
 
     /**
-     * Create basemap selector offcanvas
+     * Generate a preview tile URL from a basemap's tile URL pattern
+     * Uses a fixed tile position showing Vietnam area (zoom 5, x=25, y=14)
+     * @private
+     */
+    _getBasemapPreviewUrl(basemap) {
+        let url = basemap.url;
+        const z = 5, x = 25, y = 14;
+
+        url = url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+
+        if (basemap.options?.subdomains?.length > 0) {
+            url = url.replace('{s}', basemap.options.subdomains[0]);
+        } else {
+            url = url.replace('{s}', 'a');
+        }
+
+        return url;
+    }
+
+    /**
+     * Create basemap selector offcanvas with preview thumbnails
      * @private
      */
     _createBasemapOffcanvas() {
@@ -338,21 +358,36 @@ class MapApp {
         offcanvas.className = "offcanvas offcanvas-end";
         offcanvas.id = "basemap-offcanvas";
         offcanvas.setAttribute("tabindex", "-1");
+        offcanvas.style.width = "280px";
+        offcanvas.style.maxWidth = "80vw";
 
         offcanvas.innerHTML = `
-            <div class="offcanvas-header">
-                <h5 class="offcanvas-title">Chon nen ban do</h5>
+            <div class="offcanvas-header py-2 border-bottom">
+                <h6 class="mb-0"><i class="bi bi-layers text-primary"></i> Chon nen ban do</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
             </div>
-            <div class="offcanvas-body">
-                <div class="list-group" id="basemap-list">
-                    ${basemapsConfig.options.map(basemap => `
-                        <label class="list-group-item list-group-item-action" style="cursor: pointer;">
-                            <input class="form-check-input me-2" type="radio" name="basemap-radio" value="${basemap.id}"
-                                ${basemap.id === this.currentBasemapId ? 'checked' : ''}>
-                            ${basemap.name}
-                        </label>
-                    `).join('')}
+            <div class="offcanvas-body p-2">
+                <div class="row g-2" id="basemap-list">
+                    ${basemapsConfig.options.map(basemap => {
+                        const isActive = basemap.id === this.currentBasemapId;
+                        const previewUrl = this._getBasemapPreviewUrl(basemap);
+                        return `
+                        <div class="col-6">
+                            <div class="card basemap-card ${isActive ? 'border-primary shadow-sm' : 'border'}"
+                                 data-basemap-id="${basemap.id}"
+                                 style="cursor:pointer;overflow:hidden;transition:all .15s">
+                                <img src="${previewUrl}"
+                                     style="height:72px;object-fit:cover;display:block"
+                                     alt="${basemap.name}"
+                                     loading="lazy">
+                                <div class="px-1 py-1 text-center ${isActive ? 'bg-primary text-white' : ''}">
+                                    <div style="font-size:11px;font-weight:${isActive ? '600' : '500'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                                        ${basemap.name}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -367,11 +402,38 @@ class MapApp {
             scroll: true      // Allow scrolling body (map) while offcanvas open
         });
 
-        // Add event listeners for radio buttons
-        offcanvas.querySelectorAll('input[name="basemap-radio"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                this.switchBasemap(e.target.value);
+        // Add click event listeners for basemap cards
+        offcanvas.querySelectorAll('.basemap-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const basemapId = card.dataset.basemapId;
+                this.switchBasemap(basemapId);
+                this._updateBasemapCardStates(offcanvas, basemapId);
             });
+        });
+    }
+
+    /**
+     * Update active state of basemap cards after switching
+     * @private
+     */
+    _updateBasemapCardStates(offcanvas, activeId) {
+        offcanvas.querySelectorAll('.basemap-card').forEach(card => {
+            const isActive = card.dataset.basemapId === activeId;
+            const label = card.querySelector('div[class*="px-1"]');
+
+            if (isActive) {
+                card.className = 'card basemap-card border-primary shadow-sm';
+                if (label) {
+                    label.className = 'px-1 py-1 text-center bg-primary text-white';
+                    label.querySelector('div').style.fontWeight = '600';
+                }
+            } else {
+                card.className = 'card basemap-card border';
+                if (label) {
+                    label.className = 'px-1 py-1 text-center';
+                    label.querySelector('div').style.fontWeight = '500';
+                }
+            }
         });
     }
 
